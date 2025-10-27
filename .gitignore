@@ -1,0 +1,6 @@
+MyPromptManager/prompts/__pycache__/*
+MyPromptManager/api/__pycache__/*
+MyPromptManager/MyPromptManager/__pycache__/*
+MyPromptManager/api/tests/__pycache__/*
+MyPromptManager/prompts/tests/__pycache__/*
+MyPromptManager/api/migrations/__pycache__/*
