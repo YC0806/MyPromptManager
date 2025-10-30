@@ -361,7 +361,9 @@ class MarkdownStore:
         }
         if extra_front_matter:
             front_matter.update(extra_front_matter)
-        yaml_fragment = yaml.safe_dump(front_matter, sort_keys=False)
+        yaml_fragment = yaml.safe_dump(
+            front_matter, sort_keys=False, allow_unicode=True
+        )
         body = content.rstrip() + "\n"
         payload = f"---\n{yaml_fragment}---\n\n{body}"
         filepath.write_text(payload, encoding="utf-8")
