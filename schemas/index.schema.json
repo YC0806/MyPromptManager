@@ -1,0 +1,87 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://promptmanager.local/schemas/index.schema.json",
+  "title": "Prompt Manager Index",
+  "description": "JSON Schema for index.json cache file",
+  "type": "object",
+  "required": ["prompts", "templates"],
+  "properties": {
+    "prompts": {
+      "type": "array",
+      "description": "List of indexed prompts",
+      "items": {
+        "$ref": "#/definitions/IndexEntry"
+      }
+    },
+    "templates": {
+      "type": "array",
+      "description": "List of indexed templates",
+      "items": {
+        "$ref": "#/definitions/IndexEntry"
+      }
+    },
+    "last_updated": {
+      "type": "string",
+      "description": "Last index update timestamp",
+      "format": "date-time"
+    }
+  },
+  "definitions": {
+    "IndexEntry": {
+      "type": "object",
+      "required": ["id", "title", "file_path"],
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "ULID identifier",
+          "pattern": "^[0-9A-HJKMNP-TV-Z]{26}$"
+        },
+        "title": {
+          "type": "string",
+          "description": "Prompt/template title"
+        },
+        "description": {
+          "type": "string",
+          "description": "Brief description"
+        },
+        "project": {
+          "type": "string",
+          "description": "Project name"
+        },
+        "slug": {
+          "type": "string",
+          "description": "URL-friendly identifier"
+        },
+        "labels": {
+          "type": "array",
+          "description": "Classification labels",
+          "items": {
+            "type": "string"
+          }
+        },
+        "author": {
+          "type": "string",
+          "description": "Author name"
+        },
+        "created_at": {
+          "type": "string",
+          "description": "Creation timestamp",
+          "format": "date-time"
+        },
+        "updated_at": {
+          "type": "string",
+          "description": "Last update timestamp",
+          "format": "date-time"
+        },
+        "file_path": {
+          "type": "string",
+          "description": "Relative path in repository"
+        },
+        "sha": {
+          "type": "string",
+          "description": "Git blob SHA"
+        }
+      }
+    }
+  }
+}

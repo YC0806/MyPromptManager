@@ -1,0 +1,104 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://promptmanager.local/schemas/frontmatter.schema.json",
+  "title": "Prompt/Template Front Matter",
+  "description": "JSON Schema for YAML Front Matter in prompt and template markdown files",
+  "type": "object",
+  "required": ["id", "title", "type"],
+  "properties": {
+    "id": {
+      "type": "string",
+      "description": "ULID identifier (26 characters)",
+      "pattern": "^[0-9A-HJKMNP-TV-Z]{26}$"
+    },
+    "title": {
+      "type": "string",
+      "description": "Human-readable title",
+      "minLength": 1,
+      "maxLength": 200
+    },
+    "description": {
+      "type": "string",
+      "description": "Brief description of the prompt/template"
+    },
+    "type": {
+      "type": "string",
+      "description": "Type of content",
+      "enum": ["prompt", "template"]
+    },
+    "project": {
+      "type": "string",
+      "description": "Project name",
+      "default": "default",
+      "pattern": "^[a-z0-9_-]+$"
+    },
+    "slug": {
+      "type": "string",
+      "description": "URL-friendly identifier",
+      "pattern": "^[a-z0-9-]+$"
+    },
+    "labels": {
+      "type": "array",
+      "description": "Classification labels/tags",
+      "items": {
+        "type": "string"
+      },
+      "uniqueItems": true
+    },
+    "author": {
+      "type": "string",
+      "description": "Author name or identifier"
+    },
+    "created_at": {
+      "type": "string",
+      "description": "Creation timestamp",
+      "format": "date-time"
+    },
+    "updated_at": {
+      "type": "string",
+      "description": "Last update timestamp",
+      "format": "date-time"
+    },
+    "version": {
+      "type": "string",
+      "description": "Current version (semantic versioning)",
+      "pattern": "^v?\\d+\\.\\d+\\.\\d+(-[a-zA-Z0-9.]+)?$"
+    },
+    "model": {
+      "type": "string",
+      "description": "Target AI model (e.g., gpt-4, claude-3)"
+    },
+    "temperature": {
+      "type": "number",
+      "description": "Model temperature parameter",
+      "minimum": 0,
+      "maximum": 2
+    },
+    "max_tokens": {
+      "type": "integer",
+      "description": "Maximum tokens to generate",
+      "minimum": 1
+    },
+    "variables": {
+      "type": "object",
+      "description": "Template variable definitions",
+      "additionalProperties": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": ["string", "number", "boolean", "array", "object"]
+          },
+          "description": {
+            "type": "string"
+          },
+          "default": {},
+          "required": {
+            "type": "boolean"
+          }
+        }
+      }
+    }
+  },
+  "additionalProperties": true
+}
