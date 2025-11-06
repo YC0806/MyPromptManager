@@ -29,7 +29,6 @@ export default function Timeline() {
           notes: 'Updated API examples',
           author: 'john',
           time: new Date(),
-          project: 'api-docs',
         },
         {
           id: 2,
@@ -38,7 +37,6 @@ export default function Timeline() {
           changes: 3,
           author: 'jane',
           time: new Date(Date.now() - 3600000),
-          project: 'customer-support',
         },
         {
           id: 3,
@@ -49,7 +47,6 @@ export default function Timeline() {
           notes: 'Major update with new features',
           author: 'bob',
           time: new Date(Date.now() - 7200000),
-          project: 'dev-tools',
         },
       ]
 
@@ -131,7 +128,7 @@ function TimelineEvent({ event, isLast }) {
             <div>
               <CardTitle className="text-xl">{event.title}</CardTitle>
               <CardDescription className="mt-1">
-                {event.project} • By @{event.author} • {formatDate(event.time)}
+                By @{event.author} • {formatDate(event.time)}
               </CardDescription>
             </div>
             <div className="flex gap-2">

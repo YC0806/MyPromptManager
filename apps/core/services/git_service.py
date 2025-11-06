@@ -47,9 +47,8 @@ class GitService:
         """Create initial directory structure."""
         dirs = [
             self.repo_path / '.promptmeta' / 'schema',
-            self.repo_path / 'projects' / 'default' / 'prompts',
-            self.repo_path / 'projects' / 'default' / 'templates',
-            self.repo_path / 'projects' / 'default' / 'chats',
+            self.repo_path / 'prompts',
+            self.repo_path / 'templates',
         ]
         for dir_path in dirs:
             dir_path.mkdir(parents=True, exist_ok=True)

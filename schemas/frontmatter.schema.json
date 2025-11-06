@@ -26,12 +26,6 @@
       "description": "Type of content",
       "enum": ["prompt", "template"]
     },
-    "project": {
-      "type": "string",
-      "description": "Project name",
-      "default": "default",
-      "pattern": "^[a-z0-9_-]+$"
-    },
     "slug": {
       "type": "string",
       "description": "URL-friendly identifier",

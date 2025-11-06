@@ -26,8 +26,6 @@ export default function Topbar() {
   const {
     mode,
     setMode,
-    currentProject,
-    setCurrentProject,
     currentBranch,
     setCurrentBranch,
     currentChannel,
@@ -59,18 +57,6 @@ export default function Topbar() {
           >
             <Menu className="w-5 h-5" />
           </Button>
-
-          {/* Project Selector */}
-          <Select value={currentProject} onValueChange={setCurrentProject}>
-            <SelectTrigger className="w-[180px]">
-              <SelectValue placeholder="Select Project" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="default">Default</SelectItem>
-              <SelectItem value="api-docs">API Docs</SelectItem>
-              <SelectItem value="customer-support">Customer Support</SelectItem>
-            </SelectContent>
-          </Select>
 
           {/* Mode Toggle */}
           <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg border border-zinc-200 bg-white">

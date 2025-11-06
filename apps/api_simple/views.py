@@ -157,9 +157,8 @@ class SaveDraftView(APIView):
         else:
             # New prompt, create file path
             metadata, body = parse_frontmatter(content)
-            project = metadata.get('project', 'default')
             item_type = metadata.get('type', 'prompt')
-            file_path = f"projects/{project}/{item_type}s/{item_type}_{prompt_id}.md"
+            file_path = f"{item_type}s/{item_type}_{prompt_id}.md"
 
         # Create UI branch for this user/session
         user = request.user.username if request.user.is_authenticated else 'anonymous'

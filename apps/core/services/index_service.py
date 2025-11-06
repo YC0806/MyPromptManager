@@ -50,8 +50,7 @@ class IndexService:
         temp_path.write_text(json.dumps(data, indent=2))
         temp_path.replace(self.index_path)
 
-    def search(self, project: Optional[str] = None,
-               type_filter: Optional[str] = None,
+    def search(self, type_filter: Optional[str] = None,
                labels: Optional[List[str]] = None,
                slug: Optional[str] = None,
                author: Optional[str] = None,
@@ -61,7 +60,6 @@ class IndexService:
         Search index with filters.
 
         Args:
-            project: Filter by project name
             type_filter: Filter by type (prompt/template)
             labels: Filter by labels (AND logic)
             slug: Filter by slug
@@ -95,10 +93,6 @@ class IndexService:
                 for item in all_items:
                     # Cursor-based pagination
                     if cursor and item.get('id') <= cursor:
-                        continue
-
-                    # Project filter
-                    if project and item.get('project') != project:
                         continue
 
                     # Slug filter
@@ -161,7 +155,6 @@ class IndexService:
                     'id': prompt_id,
                     'title': fields['title'],
                     'description': fields['description'],
-                    'project': fields['project'],
                     'slug': fields['slug'],
                     'labels': fields['labels'],
                     'author': fields['author'],
@@ -268,16 +261,22 @@ class IndexService:
                     'errors': [],
                 }
 
-                # Scan projects directory
+                # Scan repository for markdown files
                 repo_root = Path(settings.GIT_REPO_ROOT)
-                projects_dir = repo_root / 'projects'
+                prompts_dir = repo_root / 'prompts'
+                templates_dir = repo_root / 'templates'
 
-                if not projects_dir.exists():
+                if not prompts_dir.exists() and not templates_dir.exists():
                     self._write_index(new_index)
                     return stats
 
-                # Find all markdown files
-                for md_file in projects_dir.rglob('*.md'):
+                # Find all markdown files in prompts and templates directories
+                search_dirs = [d for d in [prompts_dir, templates_dir] if d.exists()]
+                md_files = []
+                for search_dir in search_dirs:
+                    md_files.extend(search_dir.rglob('*.md'))
+
+                for md_file in md_files:
                     try:
                         # Read file content
                         rel_path = md_file.relative_to(repo_root)
@@ -303,7 +302,6 @@ class IndexService:
                             'id': fields['id'],
                             'title': fields['title'],
                             'description': fields['description'],
-                            'project': fields['project'],
                             'slug': fields['slug'],
                             'labels': fields['labels'],
                             'author': fields['author'],

@@ -21,7 +21,6 @@ class SearchView(APIView):
     """
 
     def get(self, request):
-        project = request.query_params.get('project')
         type_filter = request.query_params.get('type')
         labels = request.query_params.getlist('labels')
         slug = request.query_params.get('slug')
@@ -32,7 +31,6 @@ class SearchView(APIView):
         index_service = IndexService()
 
         results = index_service.search(
-            project=project,
             type_filter=type_filter,
             labels=labels if labels else None,
             slug=slug,
@@ -115,7 +113,6 @@ class FrontMatterSchemaView(APIView):
                     "title": {"type": "string", "minLength": 1},
                     "description": {"type": "string"},
                     "type": {"enum": ["prompt", "template"]},
-                    "project": {"type": "string", "default": "default"},
                     "slug": {"type": "string"},
                     "labels": {"type": "array", "items": {"type": "string"}},
                     "author": {"type": "string"},

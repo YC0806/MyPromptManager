@@ -8,13 +8,6 @@ const useStore = create((set) => ({
     set({ mode })
   },
 
-  // Current Project
-  currentProject: localStorage.getItem('currentProject') || 'default',
-  setCurrentProject: (project) => {
-    localStorage.setItem('currentProject', project)
-    set({ currentProject: project })
-  },
-
   // Current Branch (for advanced mode)
   currentBranch: localStorage.getItem('currentBranch') || 'main',
   setCurrentBranch: (branch) => {
@@ -36,7 +29,6 @@ const useStore = create((set) => ({
 
   // Filters
   filters: {
-    projects: [],
     types: [],
     labels: [],
     authors: [],

@@ -82,7 +82,6 @@ def extract_metadata_fields(metadata: Dict) -> Dict:
         - title
         - description
         - type (prompt/template)
-        - project
         - slug
         - labels (list)
         - created_at
@@ -94,7 +93,6 @@ def extract_metadata_fields(metadata: Dict) -> Dict:
         'title': metadata.get('title', ''),
         'description': metadata.get('description', ''),
         'type': metadata.get('type', 'prompt'),
-        'project': metadata.get('project', 'default'),
         'slug': metadata.get('slug', ''),
         'labels': metadata.get('labels', []),
         'created_at': metadata.get('created_at'),

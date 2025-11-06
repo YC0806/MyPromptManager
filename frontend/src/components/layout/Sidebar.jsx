@@ -3,7 +3,6 @@ import { Link, useLocation } from 'react-router-dom'
 import {
   LayoutDashboard,
   Search,
-  FolderOpen,
   FileText,
   FileCode,
   MessageSquare,
@@ -26,7 +25,6 @@ const navSections = [
     items: [
       { name: 'Dashboard', icon: LayoutDashboard, path: '/' },
       { name: 'Search', icon: Search, path: '/search' },
-      { name: 'Projects', icon: FolderOpen, path: '/projects' },
     ],
   },
   {

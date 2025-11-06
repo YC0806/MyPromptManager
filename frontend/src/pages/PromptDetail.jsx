@@ -63,7 +63,7 @@ export default function PromptDetail() {
   }
 
   const breadcrumbItems = [
-    { label: 'Project', href: '/projects' },
+    { label: 'Home', href: '/' },
     { label: 'Prompts', href: '/prompts' },
     { label: metadata.title || 'Untitled' },
   ]
