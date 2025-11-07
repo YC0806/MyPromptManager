@@ -16,12 +16,13 @@ class HistoryView(APIView):
     """
     GET /v1/detail/prompts/{id}/history
     GET /v1/detail/templates/{id}/history
-    Get full commit history for a prompt or template.
+    GET /v1/detail/chats/{id}/history
+    Get full commit history for a prompt, template, or chat.
     """
 
-    def get(self, request, prompt_id=None, template_id=None):
-        item_id = prompt_id or template_id
-        item_type = 'prompt' if prompt_id else 'template'
+    def get(self, request, prompt_id=None, template_id=None, chat_id=None):
+        item_id = prompt_id or template_id or chat_id
+        item_type = 'prompt' if prompt_id else ('template' if template_id else 'chat')
 
         limit = int(request.query_params.get('limit', 100))
         follow_renames = request.query_params.get('follow_renames', 'true') == 'true'
@@ -47,12 +48,13 @@ class DiffView(APIView):
     """
     GET /v1/detail/prompts/{id}/diff
     GET /v1/detail/templates/{id}/diff
+    GET /v1/detail/chats/{id}/diff
     Get diff between two references.
     """
 
-    def get(self, request, prompt_id=None, template_id=None):
-        item_id = prompt_id or template_id
-        item_type = 'prompt' if prompt_id else 'template'
+    def get(self, request, prompt_id=None, template_id=None, chat_id=None):
+        item_id = prompt_id or template_id or chat_id
+        item_type = 'prompt' if prompt_id else ('template' if template_id else 'chat')
 
         from_ref = request.query_params.get('from')
         to_ref = request.query_params.get('to')
@@ -76,13 +78,15 @@ class RawContentView(APIView):
     """
     GET /v1/detail/prompts/{id}/raw - Read raw markdown
     GET /v1/detail/templates/{id}/raw - Read raw markdown
+    GET /v1/detail/chats/{id}/raw - Read raw JSON
     PUT /v1/detail/prompts/{id}/raw - Write raw markdown
     PUT /v1/detail/templates/{id}/raw - Write raw markdown
+    PUT /v1/detail/chats/{id}/raw - Write raw JSON
     """
 
-    def get(self, request, prompt_id=None, template_id=None):
-        item_id = prompt_id or template_id
-        item_type = 'prompt' if prompt_id else 'template'
+    def get(self, request, prompt_id=None, template_id=None, chat_id=None):
+        item_id = prompt_id or template_id or chat_id
+        item_type = 'prompt' if prompt_id else ('template' if template_id else 'chat')
 
         ref = request.query_params.get('ref', 'main')
 
@@ -95,17 +99,18 @@ class RawContentView(APIView):
 
         content = git_service.read_file(entry['file_path'], ref if ref != 'main' else None)
 
+        content_type = 'application/json' if item_type == 'chat' else 'text/markdown'
         return Response(
             content,
-            content_type='text/markdown',
+            content_type=content_type,
             headers={
                 'ETag': git_service.get_file_sha(entry['file_path']),
             }
         )
 
-    def put(self, request, prompt_id=None, template_id=None):
-        item_id = prompt_id or template_id
-        item_type = 'prompt' if prompt_id else 'template'
+    def put(self, request, prompt_id=None, template_id=None, chat_id=None):
+        item_id = prompt_id or template_id or chat_id
+        item_type = 'prompt' if prompt_id else ('template' if template_id else 'chat')
 
         content = request.body.decode('utf-8')
         if_match = request.headers.get('If-Match')
@@ -139,7 +144,20 @@ class RawContentView(APIView):
         )
 
         # Update index
-        metadata, _ = parse_frontmatter(content)
+        if item_type == 'chat':
+            import json
+            chat_data = json.loads(content)
+            metadata = {
+                'id': chat_data.get('id', item_id),
+                'title': chat_data.get('title', ''),
+                'description': chat_data.get('description', ''),
+                'labels': chat_data.get('tags', []),
+                'author': 'system',
+                'created_at': chat_data.get('created_at', ''),
+                'type': 'chat',
+            }
+        else:
+            metadata, _ = parse_frontmatter(content)
         index_service.add_or_update(item_id, metadata, entry['file_path'], commit_sha)
 
         return Response({
@@ -152,13 +170,15 @@ class ReleasesView(APIView):
     """
     GET /v1/detail/prompts/{id}/releases - List releases
     GET /v1/detail/templates/{id}/releases - List releases
+    GET /v1/detail/chats/{id}/releases - List releases
     POST /v1/detail/prompts/{id}/releases - Create release
     POST /v1/detail/templates/{id}/releases - Create release
+    POST /v1/detail/chats/{id}/releases - Create release
     """
 
-    def get(self, request, prompt_id=None, template_id=None):
-        item_id = prompt_id or template_id
-        item_type = 'prompt' if prompt_id else 'template'
+    def get(self, request, prompt_id=None, template_id=None, chat_id=None):
+        item_id = prompt_id or template_id or chat_id
+        item_type = 'prompt' if prompt_id else ('template' if template_id else 'chat')
 
         git_service = GitService()
 
@@ -191,9 +211,9 @@ class ReleasesView(APIView):
             'count': len(releases),
         })
 
-    def post(self, request, prompt_id=None, template_id=None):
-        item_id = prompt_id or template_id
-        item_type = 'prompt' if prompt_id else 'template'
+    def post(self, request, prompt_id=None, template_id=None, chat_id=None):
+        item_id = prompt_id or template_id or chat_id
+        item_type = 'prompt' if prompt_id else ('template' if template_id else 'chat')
 
         base_sha = request.data.get('base_sha')
         version = request.data.get('version')

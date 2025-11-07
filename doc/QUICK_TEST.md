@@ -1,361 +1,264 @@
-# 快速测试指南
+# Quick Test Guide - API Integration
 
-## 🚀 一键测试所有功能
+This guide helps you quickly test the integrated prompt/template API changes.
 
-### 步骤 1: 生成测试数据
+## Prerequisites
 
-```bash
-python generate_test_data.py
-```
+1. Backend server running: `python manage.py runserver`
+2. Frontend server running: `cd frontend && npm run dev`
+3. Git repository initialized in the project root
 
-**预期输出**:
-- ✅ 创建 5 个提示词文件
-- ✅ 创建 3 个模版文件
-- ✅ 创建 2 个对话历史文件
-- ✅ 10 个 Git 提交
-- ✅ 3 个 Git 标签
-- ✅ 更新 index.json
+## Quick Backend Test
 
-### 步骤 2: 验证数据
+### 1. Run Automated Tests
 
 ```bash
-./verify_test_data.sh
+python test_api_endpoints.py
 ```
 
-**预期结果**:
+Expected output:
 ```
-✅ 通过: 18
-❌ 失败: 0
+============================================================
+API Endpoint Tests - Prompt/Template Distinction
+============================================================
+
+=== Testing URL Patterns ===
+✓ detail-prompt-history URL: /v1/detail/prompts/test-id/history
+✓ detail-template-history URL: /v1/detail/templates/test-id/history
+✓ simple-prompt-timeline URL: /v1/simple/prompts/test-id/timeline
+✓ simple-template-timeline URL: /v1/simple/templates/test-id/timeline
+✓ common-search URL: /v1/search
+
+... (more tests)
 ```
 
-### 步骤 3: 查看演示
+### 2. Manual API Tests
 
+**Test Prompt Endpoints:**
 ```bash
-./demo_test_data.sh
+# Search prompts only
+curl http://localhost:8000/v1/search?type=prompt
+
+# Get prompt history (replace with actual ID)
+curl http://localhost:8000/v1/detail/prompts/YOUR_PROMPT_ID/history
 ```
 
-这会展示所有生成的测试数据。
-
----
-
-## 🔍 验证测试数据
-
-### 验证文件存在
-
+**Test Template Endpoints:**
 ```bash
-# 查看所有生成的文件
-find repo_root/projects -type f
+# Search templates only
+curl http://localhost:8000/v1/search?type=template
 
-# 应该看到 10 个文件：
-# - 5 个 prompt_*.md
-# - 3 个 template_*.md
-# - 2 个 chat_*.json
+# Get template history (replace with actual ID)
+curl http://localhost:8000/v1/detail/templates/YOUR_TEMPLATE_ID/history
 ```
 
-### 验证 Git 历史
+## Quick Frontend Test
 
-```bash
-cd repo_root
+### 1. Open Browser Developer Console
 
-# 查看提交历史（应该有 10 个提交）
-git log --oneline
+Navigate to: `http://localhost:5173`
 
-# 查看标签（应该有 3 个标签）
-git tag
+### 2. Test API Service
 
-# 查看第一个标签的详情
-git show prompt/17624181723706T8HN33F0NQD6QF0/v1.0.0
+Open browser console and run:
+
+```javascript
+// Test importing API
+import { simpleApi, detailApi, commonApi } from './src/lib/api.js'
+
+// Test search (should work immediately)
+fetch('/v1/search?type=prompt')
+  .then(r => r.json())
+  .then(d => console.log('Prompts:', d))
+
+fetch('/v1/search?type=template')
+  .then(r => r.json())
+  .then(d => console.log('Templates:', d))
 ```
 
-### 验证索引文件
+### 3. Test Navigation
 
-```bash
-# 查看索引内容
-cat repo_root/.promptmeta/index.json | python -m json.tool
+1. Go to the prompts list page
+2. Click on any prompt
+3. Check URL contains `?type=prompt` or `?type=template`
+4. Verify detail page loads correctly
 
-# 应该看到：
-# - "prompts": [ ... 5 个条目 ... ]
-# - "templates": [ ... 3 个条目 ... ]
-```
+### 4. Test Modals
 
-### 验证文件内容
+1. Open a prompt/template detail page
+2. Click "Publish" button
+3. Verify modal opens (should not crash)
+4. Cancel and try "Rollback" button
+5. Verify rollback modal opens
 
-```bash
-# 查看第一个提示词
-head -30 repo_root/projects/default/prompts/prompt_17624181723706T8HN33F0NQD6QF0.md
+## Integration Test Checklist
 
-# 应该看到：
-# - YAML Front Matter（---包裹的 JSON）
-# - 完整的 Markdown 内容
+### Backend ✅
 
-# 查看第一个对话
-cat repo_root/projects/default/chats/chat_1762418172594N6KANY37VKC3JG48.json | python -m json.tool
+- [ ] Server starts without errors: `python manage.py runserver`
+- [ ] Django check passes: `python manage.py check`
+- [ ] Test script runs successfully: `python test_api_endpoints.py`
+- [ ] Prompt endpoints respond: `curl http://localhost:8000/v1/search?type=prompt`
+- [ ] Template endpoints respond: `curl http://localhost:8000/v1/search?type=template`
 
-# 应该看到：
-# - 完整的 JSON 结构
-# - messages 数组包含多轮对话
-```
+### Frontend ✅
 
----
+- [ ] Frontend builds: `cd frontend && npm run build`
+- [ ] Frontend dev server starts: `npm run dev`
+- [ ] No console errors on page load
+- [ ] Prompts list page loads
+- [ ] Can navigate to prompt detail with `?type=prompt`
+- [ ] Can navigate to template detail with `?type=template`
+- [ ] Publish modal accepts itemType prop
+- [ ] Rollback modal accepts itemType prop
 
-## 🌐 测试 API 端点
+### Integration ✅
 
-### 前提条件
+- [ ] Frontend can fetch prompts: `GET /v1/search?type=prompt`
+- [ ] Frontend can fetch templates: `GET /v1/search?type=template`
+- [ ] Navigation passes type parameter correctly
+- [ ] Detail page loads correct type
+- [ ] Save draft works with type
+- [ ] Publish works with type
+- [ ] Rollback works with type
 
-确保后端正在运行：
+## Common Issues & Solutions
+
+### Issue: 404 on API calls
+**Symptom:** API returns 404 Not Found
+**Solution:**
+- Check URL includes correct type: `/prompts/` or `/templates/`
+- Verify backend server is running
+- Check test_api_endpoints.py output for URL patterns
+
+### Issue: Frontend console errors
+**Symptom:** Console shows "Cannot read property 'type' of undefined"
+**Solution:**
+- Ensure metadata.type has a default value
+- Check that item type is passed in URL: `?type=prompt`
+- Verify API response includes metadata
+
+### Issue: Modals crash when opening
+**Symptom:** "itemType is not defined" error
+**Solution:**
+- Pass itemType prop to modals: `<PublishModal itemType={metadata.type} />`
+- Ensure metadata.type is set before modal opens
+
+### Issue: Search returns empty results
+**Symptom:** Search API returns empty array
+**Solution:**
+- Check if index is built: `curl http://localhost:8000/v1/index/status`
+- Rebuild index: `curl -X POST http://localhost:8000/v1/index/rebuild`
+- Verify there are .md files in prompts/ or templates/ directories
+
+## Debugging Tips
+
+### Backend Debugging
+
+1. **Check Django logs:**
 ```bash
 python manage.py runserver
+# Watch console output for errors
 ```
 
-### 基础测试
+2. **Test URL routing:**
+```python
+from django.urls import reverse
+print(reverse('detail-prompt-history', kwargs={'prompt_id': 'test'}))
+print(reverse('detail-template-history', kwargs={'template_id': 'test'}))
+```
+
+3. **Test views directly:**
+```bash
+python manage.py shell
+from apps.api_detail.views import HistoryView
+# Test view logic
+```
+
+### Frontend Debugging
+
+1. **Check API calls in Network tab:**
+- Open DevTools → Network
+- Filter by XHR/Fetch
+- Verify URLs include correct type path
+
+2. **Console log API responses:**
+```javascript
+// In component
+console.log('Item type:', metadata.type)
+console.log('API call:', simpleApi.getContent(id, metadata.type))
+```
+
+3. **Verify state:**
+```javascript
+// In React DevTools
+// Check PromptDetail component state
+// Verify metadata.type is set
+```
+
+## Quick Smoke Test Script
+
+Save this as `smoke_test.sh`:
 
 ```bash
-# 1. 健康检查
-curl http://127.0.0.1:8000/v1/health
+#!/bin/bash
 
-# 预期结果：
-# {"status":"healthy","git":{"healthy":true,...},"index":{"healthy":true,"prompts_count":5,"templates_count":3,...}}
+echo "🧪 Starting Smoke Test..."
 
-# 2. 索引状态
-curl http://127.0.0.1:8000/v1/index/status
+# Test backend
+echo "1. Testing backend health..."
+curl -s http://localhost:8000/v1/health | grep "healthy" && echo "✅ Backend healthy" || echo "❌ Backend unhealthy"
 
-# 预期结果：
-# {"prompts_count":5,"templates_count":3,...}
+# Test prompt endpoints
+echo "2. Testing prompt endpoints..."
+curl -s http://localhost:8000/v1/search?type=prompt > /dev/null && echo "✅ Prompt search works" || echo "❌ Prompt search failed"
+
+# Test template endpoints
+echo "3. Testing template endpoints..."
+curl -s http://localhost:8000/v1/search?type=template > /dev/null && echo "✅ Template search works" || echo "❌ Template search failed"
+
+# Test frontend
+echo "4. Testing frontend..."
+curl -s http://localhost:5173 > /dev/null && echo "✅ Frontend accessible" || echo "❌ Frontend not accessible"
+
+echo "🎉 Smoke test complete!"
 ```
 
-### 获取 Schema
-
+Run it:
 ```bash
-# Front Matter Schema
-curl http://127.0.0.1:8000/v1/schemas/frontmatter
-
-# Index Schema
-curl http://127.0.0.1:8000/v1/schemas/index
+chmod +x smoke_test.sh
+./smoke_test.sh
 ```
 
-### 搜索和查询
+## Success Criteria
 
-```bash
-# 搜索所有提示词
-curl "http://127.0.0.1:8000/v1/search?project=default"
+Your integration is working correctly if:
 
-# 按类型过滤
-curl "http://127.0.0.1:8000/v1/search?project=default&type=prompt"
+1. ✅ All automated tests pass
+2. ✅ Backend responds to both prompt and template endpoints
+3. ✅ Frontend loads without console errors
+4. ✅ Navigation includes type parameter
+5. ✅ Detail pages load correct content
+6. ✅ Modals open without crashing
+7. ✅ API calls include correct type path
 
-# 按标签过滤
-curl "http://127.0.0.1:8000/v1/search?project=default&labels=开发"
-```
+## Next Steps After Testing
 
-### 获取提示词内容（如果 API 已实现）
+Once all tests pass:
 
-```bash
-# 获取最新内容
-curl "http://127.0.0.1:8000/v1/simple/prompts/17624181723706T8HN33F0NQD6QF0/content?ref=latest"
+1. Review [API_ENDPOINTS.md](API_ENDPOINTS.md) for complete API reference
+2. Check [FRONTEND_MIGRATION.md](FRONTEND_MIGRATION.md) for frontend patterns
+3. Read [API_CHANGES_SUMMARY.md](API_CHANGES_SUMMARY.md) for overview
+4. Start using type-specific features in your development
 
-# 获取时间线
-curl "http://127.0.0.1:8000/v1/simple/prompts/17624181723706T8HN33F0NQD6QF0/timeline?view=all"
+## Need Help?
 
-# 获取发布列表
-curl "http://127.0.0.1:8000/v1/detail/prompts/17624181723706T8HN33F0NQD6QF0/releases"
-```
+If tests fail:
 
----
+1. Check error messages carefully
+2. Review the documentation files
+3. Verify backend and frontend servers are running
+4. Check that you're using the latest code
+5. Look at the code examples in migration guides
 
-## 🎨 测试前端界面
-
-### 启动前端
-
-```bash
-# 方法 1：使用启动脚本
-./start-frontend.sh
-
-# 方法 2：手动启动
-cd frontend
-npm run dev
-```
-
-### 访问页面
-
-打开浏览器访问：http://localhost:3000
-
-### 验证功能
-
-1. **Dashboard 页面**
-   - ✅ 应该显示 5 个提示词的统计
-   - ✅ 应该显示最近活动
-   - ✅ 应该显示快速操作按钮
-
-2. **Prompts 列表页面**
-   - ✅ 应该显示 5 个提示词
-   - ✅ 可以切换表格/卡片视图
-   - ✅ 可以按标签过滤
-   - ✅ 可以搜索
-
-3. **提示词详情页面**
-   - ✅ 点击任一提示词
-   - ✅ 应该显示完整内容
-   - ✅ 应该显示元数据
-   - ✅ 已发布的应该显示版本号
-
-4. **Timeline 页面**
-   - ✅ 应该显示 10 个提交
-   - ✅ 应该显示 3 个发布版本
-   - ✅ 每个事件应该有时间戳
-
-5. **Releases 页面**
-   - ✅ 应该显示 3 个已发布版本
-   - ✅ 显示 prod 渠道
-   - ✅ 显示版本号 v1.0.0
-
----
-
-## 🐛 常见问题
-
-### 问题 1: 生成脚本失败
-
-**症状**: `python generate_test_data.py` 报错
-
-**解决方案**:
-```bash
-# 检查 Python 版本
-python --version  # 应该是 Python 3.8+
-
-# 检查当前目录
-pwd  # 应该在项目根目录
-
-# 重新创建 repo_root
-rm -rf repo_root
-mkdir -p repo_root/.promptmeta/schema
-mkdir -p repo_root/projects/default/{prompts,templates,chats}
-cd repo_root && git init && cd ..
-
-# 重新运行
-python generate_test_data.py
-```
-
-### 问题 2: 验证脚本失败
-
-**症状**: `./verify_test_data.sh` 显示失败项
-
-**解决方案**:
-```bash
-# 查看具体失败项
-./verify_test_data.sh
-
-# 根据失败项检查：
-# - 如果是目录不存在，重新运行生成脚本
-# - 如果是文件数量错误，删除 repo_root 重新生成
-# - 如果是 Git 配置错误，手动配置 Git
-```
-
-### 问题 3: 后端 API 返回错误
-
-**症状**: `curl` 命令返回 404 或 500 错误
-
-**可能原因**:
-1. 后端服务未启动
-2. API 端点尚未实现
-3. Git 仓库路径配置错误
-
-**检查步骤**:
-```bash
-# 1. 确认后端运行
-curl http://127.0.0.1:8000/v1/health
-
-# 2. 检查配置
-cat config/settings.py | grep GIT_REPO_ROOT
-
-# 3. 检查仓库路径
-ls -la repo_root/
-```
-
-### 问题 4: 前端无法显示数据
-
-**症状**: 前端页面空白或显示"无数据"
-
-**解决方案**:
-```bash
-# 1. 检查后端 API
-curl http://127.0.0.1:8000/v1/index/status
-
-# 2. 检查浏览器控制台（F12）
-#    查看是否有网络错误
-
-# 3. 重建索引
-curl -X POST http://127.0.0.1:8000/v1/index/rebuild
-
-# 4. 刷新页面
-```
-
----
-
-## 📊 预期结果总结
-
-### 文件系统
-
-```
-repo_root/
-├── projects/default/
-│   ├── prompts/     → 5 个 .md 文件
-│   ├── templates/   → 3 个 .md 文件
-│   └── chats/       → 2 个 .json 文件
-└── .promptmeta/
-    └── index.json   → 包含 5 个提示词 + 3 个模版的索引
-```
-
-### Git 仓库
-
-- ✅ 10 个提交（每个文件一个提交）
-- ✅ 3 个注释标签（前 3 个提示词的 v1.0.0）
-- ✅ 1 个分支（master）
-- ✅ Git 用户配置：Test User <test@example.com>
-
-### API 响应
-
-- ✅ `/v1/health` → `{"status":"healthy",...}`
-- ✅ `/v1/index/status` → `{"prompts_count":5,"templates_count":3,...}`
-- ✅ 其他端点根据实现情况
-
-### 前端界面
-
-- ✅ Dashboard 显示统计数据
-- ✅ Prompts 列表显示 5 个提示词
-- ✅ Timeline 显示 10 个事件
-- ✅ Releases 显示 3 个版本
-
----
-
-## 🎯 下一步
-
-测试数据生成并验证成功后，你可以：
-
-1. **开发功能**
-   - 使用这些测试数据进行功能开发
-   - 测试搜索、过滤、排序等功能
-
-2. **测试 API**
-   - 实现并测试各个 API 端点
-   - 验证数据的正确性
-
-3. **优化前端**
-   - 改进 UI/UX
-   - 添加更多交互功能
-
-4. **添加更多数据**
-   - 编辑 `generate_test_data.py`
-   - 添加更多提示词、模版或对话
-
----
-
-## 📚 相关文档
-
-- [TEST_DATA_README.md](TEST_DATA_README.md) - 详细说明
-- [TEST_DATA_SUMMARY.md](TEST_DATA_SUMMARY.md) - 完成总结
-- [README.md](README.md) - 项目总览
-- [USAGE_EXAMPLES.md](USAGE_EXAMPLES.md) - 使用示例
-
----
-
-**快速测试完成！** ✅
-
-如有问题，请查看相关文档或检查错误日志。
+Happy testing! 🚀

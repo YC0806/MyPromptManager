@@ -1,0 +1,291 @@
+import React, { useState, useEffect } from 'react'
+import { useParams, useNavigate } from 'react-router-dom'
+import { Save, Send, History, User, Bot } from 'lucide-react'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import { Textarea } from '@/components/ui/textarea'
+import { Badge } from '@/components/ui/badge'
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import Breadcrumb from '@/components/layout/Breadcrumb'
+import PublishModal from '@/components/modals/PublishModal'
+import useStore from '@/store/useStore'
+import { simpleApi } from '@/lib/api'
+import { formatDate } from '@/lib/utils'
+
+export default function ChatDetail() {
+  const { id } = useParams()
+  const navigate = useNavigate()
+  const { mode } = useStore()
+  const [chatData, setChatData] = useState({
+    id: '',
+    title: '',
+    description: '',
+    tags: [],
+    messages: [],
+    created_at: '',
+    updated_at: '',
+  })
+  const [saving, setSaving] = useState(false)
+  const [showPublishModal, setShowPublishModal] = useState(false)
+
+  useEffect(() => {
+    loadChat()
+  }, [id])
+
+  const loadChat = async () => {
+    try {
+      const response = await simpleApi.getContent(id, 'chat', { ref: 'latest' })
+      const data = response.data
+      setChatData(data.content || {})
+    } catch (error) {
+      console.error('Failed to load chat:', error)
+    }
+  }
+
+  const handleSave = async () => {
+    try {
+      setSaving(true)
+      await simpleApi.saveDraft(id, 'chat', {
+        content: chatData,
+        message: 'Chat updated',
+      })
+      // Show success toast
+    } catch (error) {
+      console.error('Failed to save chat:', error)
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const breadcrumbItems = [
+    { label: 'Home', href: '/' },
+    { label: 'Chats', href: '/chats' },
+    { label: chatData.title || 'Untitled' },
+  ]
+
+  return (
+    <div className="min-h-screen">
+      <Breadcrumb items={breadcrumbItems} />
+
+      <div className="max-w-7xl mx-auto px-8 py-8">
+        {/* Header Actions */}
+        <div className="flex items-center justify-between mb-6">
+          <div>
+            <h1 className="text-3xl font-bold text-zinc-900">{chatData.title}</h1>
+            <div className="flex gap-2 mt-2">
+              {chatData.tags?.map((tag, idx) => (
+                <Badge key={idx} variant="outline">{tag}</Badge>
+              ))}
+            </div>
+          </div>
+          <div className="flex gap-2">
+            <Button variant="outline" onClick={handleSave} disabled={saving}>
+              <Save className="w-4 h-4 mr-2" />
+              {saving ? 'Saving...' : 'Save'}
+            </Button>
+            <Button className="bg-teal-500 hover:bg-teal-600" onClick={() => setShowPublishModal(true)}>
+              <Send className="w-4 h-4 mr-2" />
+              Publish
+            </Button>
+            <Button variant="outline" onClick={() => navigate(`/chats/${id}/timeline`)}>
+              <History className="w-4 h-4 mr-2" />
+              Timeline
+            </Button>
+          </div>
+        </div>
+
+        {/* Content */}
+        <div className="grid grid-cols-12 gap-6">
+          {/* Messages View (8/12) */}
+          <div className="col-span-8">
+            <Card>
+              <CardHeader>
+                <CardTitle>Conversation</CardTitle>
+                <CardDescription>
+                  {chatData.messages?.length || 0} messages • Created {formatDate(chatData.created_at)}
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="h-[600px] overflow-y-auto pr-4">
+                  <div className="space-y-4">
+                    {chatData.messages?.map((message, idx) => (
+                      <MessageBubble key={idx} message={message} />
+                    ))}
+                    {(!chatData.messages || chatData.messages.length === 0) && (
+                      <div className="text-center py-12 text-zinc-500">
+                        No messages in this conversation yet.
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Metadata Panel (4/12) */}
+          <div className="col-span-4">
+            <Card>
+              <CardHeader>
+                <CardTitle>Chat Details</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {/* Title */}
+                <div>
+                  <Label htmlFor="title">Title</Label>
+                  <Input
+                    id="title"
+                    value={chatData.title}
+                    onChange={(e) => setChatData({ ...chatData, title: e.target.value })}
+                    placeholder="Chat title..."
+                  />
+                </div>
+
+                {/* Description */}
+                <div>
+                  <Label htmlFor="description">Description</Label>
+                  <Textarea
+                    id="description"
+                    value={chatData.description}
+                    onChange={(e) => setChatData({ ...chatData, description: e.target.value })}
+                    placeholder="Brief description..."
+                    rows={3}
+                  />
+                </div>
+
+                {/* Tags */}
+                <div>
+                  <Label htmlFor="tags">Tags</Label>
+                  <Input
+                    id="tags"
+                    value={chatData.tags?.join(', ') || ''}
+                    onChange={(e) => setChatData({ ...chatData, tags: e.target.value.split(',').map(t => t.trim()).filter(Boolean) })}
+                    placeholder="tag1, tag2, tag3"
+                  />
+                  <p className="text-xs text-zinc-500 mt-1">Comma-separated tags</p>
+                </div>
+
+                {/* Stats */}
+                <div className="pt-4 border-t">
+                  <h3 className="font-semibold text-sm text-zinc-700 mb-2">Statistics</h3>
+                  <div className="space-y-2 text-sm">
+                    <div className="flex justify-between">
+                      <span className="text-zinc-600">Messages:</span>
+                      <span className="font-medium">{chatData.messages?.length || 0}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-zinc-600">Created:</span>
+                      <span className="font-medium">{formatDate(chatData.created_at)}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-zinc-600">Updated:</span>
+                      <span className="font-medium">{formatDate(chatData.updated_at)}</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Export */}
+                {mode === 'advanced' && (
+                  <div className="pt-4 border-t">
+                    <Button variant="outline" className="w-full">
+                      Export Chat
+                    </Button>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </div>
+        </div>
+
+        {/* Advanced Features */}
+        {mode === 'advanced' && (
+          <div className="mt-6">
+            <Card>
+              <CardHeader>
+                <CardTitle>Advanced Options</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <Tabs defaultValue="json">
+                  <TabsList>
+                    <TabsTrigger value="json">Raw JSON</TabsTrigger>
+                    <TabsTrigger value="analysis">Analysis</TabsTrigger>
+                  </TabsList>
+                  <TabsContent value="json" className="mt-4">
+                    <Textarea
+                      value={JSON.stringify(chatData, null, 2)}
+                      onChange={(e) => {
+                        try {
+                          setChatData(JSON.parse(e.target.value))
+                        } catch (err) {
+                          // Invalid JSON, ignore
+                        }
+                      }}
+                      className="min-h-[300px] font-mono text-xs"
+                      placeholder="Chat data in JSON format..."
+                    />
+                  </TabsContent>
+                  <TabsContent value="analysis" className="mt-4">
+                    <div className="space-y-4">
+                      <div>
+                        <h4 className="font-semibold text-sm mb-2">Conversation Statistics</h4>
+                        <div className="grid grid-cols-2 gap-4 text-sm">
+                          <div>
+                            <span className="text-zinc-600">User Messages:</span>
+                            <span className="ml-2 font-medium">
+                              {chatData.messages?.filter(m => m.role === 'user').length || 0}
+                            </span>
+                          </div>
+                          <div>
+                            <span className="text-zinc-600">Assistant Messages:</span>
+                            <span className="ml-2 font-medium">
+                              {chatData.messages?.filter(m => m.role === 'assistant').length || 0}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </TabsContent>
+                </Tabs>
+              </CardContent>
+            </Card>
+          </div>
+        )}
+      </div>
+
+      {/* Modals */}
+      <PublishModal open={showPublishModal} onClose={() => setShowPublishModal(false)} promptId={id} itemType="chat" />
+    </div>
+  )
+}
+
+function MessageBubble({ message }) {
+  const isUser = message.role === 'user'
+
+  return (
+    <div className={`flex gap-3 ${isUser ? 'flex-row-reverse' : 'flex-row'}`}>
+      {/* Avatar */}
+      <div className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center ${
+        isUser ? 'bg-blue-100 text-blue-600' : 'bg-teal-100 text-teal-600'
+      }`}>
+        {isUser ? <User className="w-5 h-5" /> : <Bot className="w-5 h-5" />}
+      </div>
+
+      {/* Message Content */}
+      <div className={`flex-1 max-w-[70%] ${isUser ? 'items-end' : 'items-start'}`}>
+        <div className={`rounded-lg px-4 py-2 ${
+          isUser
+            ? 'bg-blue-500 text-white'
+            : 'bg-zinc-100 text-zinc-900'
+        }`}>
+          <p className="text-sm whitespace-pre-wrap">{message.content}</p>
+        </div>
+        {message.timestamp && (
+          <p className="text-xs text-zinc-500 mt-1 px-1">
+            {formatDate(message.timestamp)}
+          </p>
+        )}
+      </div>
+    </div>
+  )
+}

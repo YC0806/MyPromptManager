@@ -30,6 +30,7 @@ class IndexService:
             initial_data = {
                 'prompts': [],
                 'templates': [],
+                'chats': [],
                 'last_updated': datetime.utcnow().isoformat(),
             }
             self.index_path.write_text(json.dumps(initial_data, indent=2))
@@ -40,7 +41,7 @@ class IndexService:
         try:
             return json.loads(self.index_path.read_text())
         except json.JSONDecodeError:
-            return {'prompts': [], 'templates': []}
+            return {'prompts': [], 'templates': [], 'chats': []}
 
     def _write_index(self, data: Dict):
         """Write index.json atomically (requires lock to be held)."""
@@ -83,6 +84,8 @@ class IndexService:
                     collections.append(index_data.get('prompts', []))
                 if not type_filter or type_filter == 'template':
                     collections.append(index_data.get('templates', []))
+                if not type_filter or type_filter == 'chat':
+                    collections.append(index_data.get('chats', []))
 
                 # Flatten and filter
                 all_items = []
@@ -147,7 +150,13 @@ class IndexService:
                 fields = extract_metadata_fields(metadata)
                 item_type = fields.get('type', 'prompt')
 
-                collection_key = 'prompts' if item_type == 'prompt' else 'templates'
+                # Determine collection based on type
+                if item_type == 'chat':
+                    collection_key = 'chats'
+                elif item_type == 'template':
+                    collection_key = 'templates'
+                else:
+                    collection_key = 'prompts'
                 collection = index_data.get(collection_key, [])
 
                 # Create index entry
@@ -194,8 +203,8 @@ class IndexService:
             with lock:
                 index_data = self._read_index()
 
-                # Remove from both collections
-                for collection_key in ['prompts', 'templates']:
+                # Remove from all collections
+                for collection_key in ['prompts', 'templates', 'chats']:
                     collection = index_data.get(collection_key, [])
                     index_data[collection_key] = [
                         item for item in collection if item['id'] != prompt_id
@@ -222,8 +231,8 @@ class IndexService:
             with lock:
                 index_data = self._read_index()
 
-                # Search in both collections
-                for collection_key in ['prompts', 'templates']:
+                # Search in all collections
+                for collection_key in ['prompts', 'templates', 'chats']:
                     collection = index_data.get(collection_key, [])
                     for item in collection:
                         if item['id'] == prompt_id:
@@ -253,20 +262,23 @@ class IndexService:
                 new_index = {
                     'prompts': [],
                     'templates': [],
+                    'chats': [],
                 }
 
                 stats = {
                     'prompts_added': 0,
                     'templates_added': 0,
+                    'chats_added': 0,
                     'errors': [],
                 }
 
-                # Scan repository for markdown files
+                # Scan repository for markdown and JSON files
                 repo_root = Path(settings.GIT_REPO_ROOT)
                 prompts_dir = repo_root / 'prompts'
                 templates_dir = repo_root / 'templates'
+                chats_dir = repo_root / 'chats'
 
-                if not prompts_dir.exists() and not templates_dir.exists():
+                if not prompts_dir.exists() and not templates_dir.exists() and not chats_dir.exists():
                     self._write_index(new_index)
                     return stats
 
@@ -275,6 +287,11 @@ class IndexService:
                 md_files = []
                 for search_dir in search_dirs:
                     md_files.extend(search_dir.rglob('*.md'))
+
+                # Find all JSON files in chats directory
+                json_files = []
+                if chats_dir.exists():
+                    json_files.extend(chats_dir.rglob('*.json'))
 
                 for md_file in md_files:
                     try:
@@ -324,6 +341,48 @@ class IndexService:
                             'error': str(e),
                         })
 
+                # Process chat JSON files
+                for json_file in json_files:
+                    try:
+                        # Read file content
+                        rel_path = json_file.relative_to(repo_root)
+                        content = git_service.read_file(str(rel_path))
+
+                        # Parse JSON
+                        chat_data = json.loads(content)
+
+                        if not chat_data.get('id'):
+                            continue
+
+                        # Get file SHA
+                        try:
+                            sha = git_service.get_file_sha(str(rel_path))
+                        except:
+                            sha = 'unknown'
+
+                        # Extract fields from chat data
+                        entry = {
+                            'id': chat_data.get('id'),
+                            'title': chat_data.get('title', ''),
+                            'description': chat_data.get('description', ''),
+                            'slug': chat_data.get('id'),  # Use ID as slug for chats
+                            'labels': chat_data.get('tags', []),
+                            'author': chat_data.get('author', 'system'),
+                            'created_at': chat_data.get('created_at', datetime.utcnow().isoformat()),
+                            'updated_at': chat_data.get('updated_at', datetime.utcnow().isoformat()),
+                            'file_path': str(rel_path),
+                            'sha': sha,
+                        }
+
+                        new_index['chats'].append(entry)
+                        stats['chats_added'] += 1
+
+                    except Exception as e:
+                        stats['errors'].append({
+                            'file': str(json_file),
+                            'error': str(e),
+                        })
+
                 self._write_index(new_index)
                 return stats
 
@@ -346,6 +405,7 @@ class IndexService:
                 return {
                     'prompts_count': len(index_data.get('prompts', [])),
                     'templates_count': len(index_data.get('templates', [])),
+                    'chats_count': len(index_data.get('chats', [])),
                     'last_updated': index_data.get('last_updated'),
                     'index_size_bytes': self.index_path.stat().st_size if self.index_path.exists() else 0,
                 }

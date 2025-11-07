@@ -19,12 +19,13 @@ class TimelineView(APIView):
     """
     GET /v1/simple/prompts/{id}/timeline
     GET /v1/simple/templates/{id}/timeline
-    Get timeline of releases and drafts for a prompt or template.
+    GET /v1/simple/chats/{id}/timeline
+    Get timeline of releases and drafts for a prompt, template, or chat.
     """
 
-    def get(self, request, prompt_id=None, template_id=None):
-        item_id = prompt_id or template_id
-        item_type = 'prompt' if prompt_id else 'template'
+    def get(self, request, prompt_id=None, template_id=None, chat_id=None):
+        item_id = prompt_id or template_id or chat_id
+        item_type = 'prompt' if prompt_id else ('template' if template_id else 'chat')
 
         view_mode = request.query_params.get('view', 'releases')
         limit = int(request.query_params.get('limit', 50))
@@ -89,12 +90,13 @@ class ContentView(APIView):
     """
     GET /v1/simple/prompts/{id}/content
     GET /v1/simple/templates/{id}/content
+    GET /v1/simple/chats/{id}/content
     Get content of a specific version.
     """
 
-    def get(self, request, prompt_id=None, template_id=None):
-        item_id = prompt_id or template_id
-        item_type = 'prompt' if prompt_id else 'template'
+    def get(self, request, prompt_id=None, template_id=None, chat_id=None):
+        item_id = prompt_id or template_id or chat_id
+        item_type = 'prompt' if prompt_id else ('template' if template_id else 'chat')
 
         ref = request.query_params.get('ref', 'latest')
 
@@ -129,27 +131,39 @@ class ContentView(APIView):
         # Read content
         content = git_service.read_file(file_path, ref)
 
-        metadata, body = parse_frontmatter(content)
-
-        return Response({
-            f'{item_type}_id': item_id,
-            'ref': ref,
-            'content': content,
-            'metadata': metadata,
-            'body': body,
-        })
+        # Parse content based on type
+        if item_type == 'chat':
+            # Chat files are JSON format
+            import json
+            chat_data = json.loads(content)
+            return Response({
+                f'{item_type}_id': item_id,
+                'ref': ref,
+                'content': chat_data,
+            })
+        else:
+            # Prompt/Template files are Markdown with frontmatter
+            metadata, body = parse_frontmatter(content)
+            return Response({
+                f'{item_type}_id': item_id,
+                'ref': ref,
+                'content': content,
+                'metadata': metadata,
+                'body': body,
+            })
 
 
 class SaveDraftView(APIView):
     """
     POST /v1/simple/prompts/{id}/save
     POST /v1/simple/templates/{id}/save
+    POST /v1/simple/chats/{id}/save
     Save draft to hidden UI branch.
     """
 
-    def post(self, request, prompt_id=None, template_id=None):
-        item_id = prompt_id or template_id
-        item_type = 'prompt' if prompt_id else 'template'
+    def post(self, request, prompt_id=None, template_id=None, chat_id=None):
+        item_id = prompt_id or template_id or chat_id
+        item_type = 'prompt' if prompt_id else ('template' if template_id else 'chat')
 
         content = request.data.get('content')
         message = request.data.get('message', 'Draft save')
@@ -168,9 +182,12 @@ class SaveDraftView(APIView):
             file_path = entry['file_path']
         else:
             # New item, create file path
-            metadata, body = parse_frontmatter(content)
-            content_type = metadata.get('type', item_type)
-            file_path = f"{content_type}s/{content_type}_{item_id}.md"
+            if item_type == 'chat':
+                file_path = f"chats/chat_{item_id}.json"
+            else:
+                metadata, body = parse_frontmatter(content)
+                content_type = metadata.get('type', item_type)
+                file_path = f"{content_type}s/{content_type}_{item_id}.md"
 
         # Create UI branch for this user/session
         user = request.user.username if request.user.is_authenticated else 'anonymous'
@@ -183,11 +200,22 @@ class SaveDraftView(APIView):
         except:
             pass
 
+        # Prepare content for writing
+        if item_type == 'chat':
+            # For chat, convert dict to JSON string if needed
+            import json
+            if isinstance(content, dict):
+                write_content = json.dumps(content, indent=2, ensure_ascii=False)
+            else:
+                write_content = content
+        else:
+            write_content = content
+
         # Write file
         commit_message = f"Save draft for {item_id}: {message}"
         sha = git_service.write_file(
             file_path,
-            content,
+            write_content,
             commit_message,
             author=f"{user} <{user}@promptmanager.local>"
         )
@@ -216,12 +244,13 @@ class PublishView(APIView):
     """
     POST /v1/simple/prompts/{id}/publish
     POST /v1/simple/templates/{id}/publish
+    POST /v1/simple/chats/{id}/publish
     Publish a version (merge UI branch and create tag).
     """
 
-    def post(self, request, prompt_id=None, template_id=None):
-        item_id = prompt_id or template_id
-        item_type = 'prompt' if prompt_id else 'template'
+    def post(self, request, prompt_id=None, template_id=None, chat_id=None):
+        item_id = prompt_id or template_id or chat_id
+        item_type = 'prompt' if prompt_id else ('template' if template_id else 'chat')
 
         base_sha = request.data.get('base_sha')
         channel = request.data.get('channel', 'prod')
@@ -291,7 +320,21 @@ class PublishView(APIView):
         )
 
         # Update index
-        metadata, _ = parse_frontmatter(content)
+        if item_type == 'chat':
+            import json
+            chat_data = json.loads(content)
+            # Create metadata from chat data
+            metadata = {
+                'id': chat_data.get('id', item_id),
+                'title': chat_data.get('title', ''),
+                'description': chat_data.get('description', ''),
+                'labels': chat_data.get('tags', []),
+                'author': 'system',
+                'created_at': chat_data.get('created_at', ''),
+                'type': 'chat',
+            }
+        else:
+            metadata, _ = parse_frontmatter(content)
         index_service.add_or_update(item_id, metadata, file_path, commit_sha)
 
         return Response({
@@ -309,12 +352,13 @@ class CompareView(APIView):
     """
     GET /v1/simple/prompts/{id}/compare
     GET /v1/simple/templates/{id}/compare
+    GET /v1/simple/chats/{id}/compare
     Compare two versions.
     """
 
-    def get(self, request, prompt_id=None, template_id=None):
-        item_id = prompt_id or template_id
-        item_type = 'prompt' if prompt_id else 'template'
+    def get(self, request, prompt_id=None, template_id=None, chat_id=None):
+        item_id = prompt_id or template_id or chat_id
+        item_type = 'prompt' if prompt_id else ('template' if template_id else 'chat')
 
         from_ref = request.query_params.get('from')
         to_ref = request.query_params.get('to', 'latest')
@@ -353,8 +397,13 @@ class CompareView(APIView):
         from_content = git_service.read_file(file_path, from_ref)
         to_content = git_service.read_file(file_path, to_ref)
 
-        from_meta, _ = parse_frontmatter(from_content)
-        to_meta, _ = parse_frontmatter(to_content)
+        if item_type == 'chat':
+            import json
+            from_meta = json.loads(from_content)
+            to_meta = json.loads(to_content)
+        else:
+            from_meta, _ = parse_frontmatter(from_content)
+            to_meta, _ = parse_frontmatter(to_content)
 
         # Calculate metadata changes
         metadata_changes = {}
@@ -381,12 +430,13 @@ class RollbackView(APIView):
     """
     POST /v1/simple/prompts/{id}/rollback
     POST /v1/simple/templates/{id}/rollback
+    POST /v1/simple/chats/{id}/rollback
     Rollback to previous version.
     """
 
-    def post(self, request, prompt_id=None, template_id=None):
-        item_id = prompt_id or template_id
-        item_type = 'prompt' if prompt_id else 'template'
+    def post(self, request, prompt_id=None, template_id=None, chat_id=None):
+        item_id = prompt_id or template_id or chat_id
+        item_type = 'prompt' if prompt_id else ('template' if template_id else 'chat')
 
         to_version = request.data.get('to_version')
         channel = request.data.get('channel', 'prod')
@@ -444,7 +494,20 @@ class RollbackView(APIView):
         )
 
         # Update index
-        metadata, _ = parse_frontmatter(rollback_content)
+        if item_type == 'chat':
+            import json
+            chat_data = json.loads(rollback_content)
+            metadata = {
+                'id': chat_data.get('id', item_id),
+                'title': chat_data.get('title', ''),
+                'description': chat_data.get('description', ''),
+                'labels': chat_data.get('tags', []),
+                'author': 'system',
+                'created_at': chat_data.get('created_at', ''),
+                'type': 'chat',
+            }
+        else:
+            metadata, _ = parse_frontmatter(rollback_content)
         index_service.add_or_update(item_id, metadata, file_path, commit_sha)
 
         return Response({

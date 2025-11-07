@@ -7,6 +7,8 @@ import PromptsList from './pages/PromptsList'
 import PromptDetail from './pages/PromptDetail'
 import TemplatesList from './pages/TemplatesList'
 import TemplateDetail from './pages/TemplateDetail'
+import ChatsList from './pages/ChatsList'
+import ChatDetail from './pages/ChatDetail'
 import Releases from './pages/Releases'
 import Timeline from './pages/Timeline'
 import RepoAdvanced from './pages/RepoAdvanced'
@@ -33,7 +35,8 @@ function App() {
               <Route path="/prompts/:id" element={<PromptDetail />} />
               <Route path="/templates" element={<TemplatesList />} />
               <Route path="/templates/:id" element={<TemplateDetail />} />
-              <Route path="/chats" element={<PromptsList />} />
+              <Route path="/chats" element={<ChatsList />} />
+              <Route path="/chats/:id" element={<ChatDetail />} />
               <Route path="/releases" element={<Releases />} />
               <Route path="/timeline" element={<Timeline />} />
               <Route path="/repo" element={<RepoAdvanced />} />

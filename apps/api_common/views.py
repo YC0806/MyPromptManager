@@ -17,7 +17,7 @@ from apps.core.exceptions import ValidationError
 class SearchView(APIView):
     """
     GET /v1/search
-    Search prompts and templates in index.
+    Search prompts, templates, and chats in index.
     """
 
     def get(self, request):
@@ -112,7 +112,7 @@ class FrontMatterSchemaView(APIView):
                     "id": {"type": "string", "pattern": "^[0-9A-HJKMNP-TV-Z]{26}$"},
                     "title": {"type": "string", "minLength": 1},
                     "description": {"type": "string"},
-                    "type": {"enum": ["prompt", "template"]},
+                    "type": {"enum": ["prompt", "template", "chat"]},
                     "slug": {"type": "string"},
                     "labels": {"type": "array", "items": {"type": "string"}},
                     "author": {"type": "string"},
@@ -138,10 +138,11 @@ class IndexSchemaView(APIView):
             return Response({
                 "$schema": "http://json-schema.org/draft-07/schema#",
                 "type": "object",
-                "required": ["prompts", "templates"],
+                "required": ["prompts", "templates", "chats"],
                 "properties": {
                     "prompts": {"type": "array"},
                     "templates": {"type": "array"},
+                    "chats": {"type": "array"},
                     "last_updated": {"type": "string", "format": "date-time"}
                 }
             })
@@ -173,8 +174,8 @@ class ValidateFrontMatterView(APIView):
                 errors.append("Missing required field: title")
             if not metadata.get('type'):
                 errors.append("Missing required field: type")
-            elif metadata['type'] not in ['prompt', 'template']:
-                errors.append("Invalid type: must be 'prompt' or 'template'")
+            elif metadata['type'] not in ['prompt', 'template', 'chat']:
+                errors.append("Invalid type: must be 'prompt', 'template', or 'chat'")
 
             # Validate ULID format
             if metadata.get('id'):

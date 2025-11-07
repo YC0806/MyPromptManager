@@ -54,43 +54,46 @@ npm run dev
 
 前端应用将在 http://localhost:3000 启动。
 
-### 测试数据生成（可选）
+### Git 数据目录与索引
 
-如果需要一些测试数据来快速体验功能：
+项目使用独立的 Git 仓库存放所有 Markdown 内容。默认路径是 `repo_root/`（可通过 `GIT_REPO_ROOT` 环境变量覆盖），其布局如下：
+
+- `.git/`：dulwich 初始化的 Git 数据目录
+- `.promptmeta/index.json`：索引缓存，由 `IndexService` + filelock 维护
+- `prompts/`：提示词 Markdown
+- `templates/`：模版 Markdown
+
+可通过以下方式管理索引：
+
+- `GET /v1/index/status`：查看索引文件元数据与统计
+- `POST /v1/index/rebuild`：扫描 Git 仓库并重建索引
+- `POST /v1/index/repair`：针对损坏索引的快速修复
+
+### 管理提示词 / 模版数据
+
+1. **直接编辑仓库**：在 `repo_root/prompts/*.md` 或 `repo_root/templates/*.md` 中维护带 Front Matter 的 Markdown，并推送到 Git。
+2. **通过 API 操作**：Simple API 负责草稿保存与发布，Detail API 提供原始读写、Diff、Tag 等全量能力。
+3. **刷新索引**：新增/重命名文件后，调用 `POST /v1/index/rebuild` 或 `POST /v1/index/repair` 以让搜索结果同步。
+4. **版本追踪**：`VersionService` 使用 `prompt/<id>/vX.Y.Z` 形式的 Git 标签来记录发布元数据（channel、notes 等）。
+
+> 💡 仓库仍保留 `generate_test_data.py`，运行前请先阅读脚本并确认其输出路径与当前 `repo_root` 结构一致。
+
+### API 自检
+
+`test_api_endpoints.py` 使用 Django `RequestFactory` 对 Simple/Detail/Common API 做冒烟测试，确保 prompt/template 路由均可解析：
 
 ```bash
-# 生成测试数据（5 个提示词 + 3 个模版 + 2 个对话历史）
-python generate_test_data.py
-
-# 验证测试数据
-./verify_test_data.sh
-
-# 查看测试数据演示
-./demo_test_data.sh
+python test_api_endpoints.py
 ```
 
-测试数据包括：
-- ✅ 5 个提示词（代码审查助手、API 文档生成器、SQL 查询优化器等）
-- ✅ 3 个模版（代码生成模版、测试用例模版、数据分析模版）
-- ✅ 2 个对话历史（代码重构讨论、API 设计讨论）
-- ✅ 3 个已发布版本（v1.0.0）
-
-详见：[TEST_DATA_README.md](TEST_DATA_README.md)
-
-### 后端 API 测试
-
-验证后端 API 是否正常工作：
+如需手动探活，可执行：
 
 ```bash
-# 运行自动化测试
-./test_backend_apis.sh
-
-# 或手动测试单个端点
 curl http://127.0.0.1:8000/v1/health
-curl http://127.0.0.1:8000/v1/search?project=default
+curl "http://127.0.0.1:8000/v1/search?type=prompt"
 ```
 
-所有后端问题已修复，详见：[BACKEND_FIXES.md](BACKEND_FIXES.md)
+更多排查记录参见 [doc/BACKEND_FIXES.md](doc/BACKEND_FIXES.md)。
 
 ### 完整开发环境
 
@@ -116,34 +119,32 @@ cd frontend && npm run dev
 
 访问 http://localhost:3000 即可使用完整应用，**无需登录**！
 
-> 📖 详细说明请查看 [LOCAL_SETUP.md](LOCAL_SETUP.md)
+> 📖 详细安装与排错步骤请查看 [doc/LOCAL_SETUP.md](doc/LOCAL_SETUP.md)
 
 ## API 端点
 
 ### Simple API（简化版 - `/v1/simple/`）
 
-适合非技术用户，提供简化的操作界面：
+面向非技术用户，所有端点同时支持 `prompts/{id}` 与 `templates/{id}` 路径：
 
-- `GET /v1/simple/prompts/{id}/timeline` - 查看时间线
-- `GET /v1/simple/prompts/{id}/content` - 获取内容
-- `POST /v1/simple/prompts/{id}/save` - 保存草稿
-- `POST /v1/simple/prompts/{id}/publish` - 发布版本
-- `GET /v1/simple/prompts/{id}/compare` - 比较版本
-- `POST /v1/simple/prompts/{id}/rollback` - 回滚版本
+- `GET .../timeline`：查看发布时间线（支持 release / draft 视图）
+- `GET .../content`：按版本或最新发布读取内容与 Front Matter
+- `POST .../save`：保存草稿（UI 分支）
+- `POST .../publish`：发布版本并创建标签
+- `GET .../compare`：比较两个版本的内容与元数据
+- `POST .../rollback`：基于指定版本回滚并重新发布
 
 ### Detail API（技术版 - `/v1/detail/`）
 
-适合技术用户，提供完整的 Git 访问：
+为技术用户提供完整 Git 能力，同样兼容 prompt/template：
 
-- `GET /v1/detail/prompts/{id}/history` - 完整提交历史
-- `GET /v1/detail/prompts/{id}/diff` - 详细差异对比
-- `GET /v1/detail/prompts/{id}/raw` - 读取原始 Markdown
-- `PUT /v1/detail/prompts/{id}/raw` - 更新原始 Markdown
-- `GET /v1/detail/prompts/{id}/releases` - 列出所有发布
-- `POST /v1/detail/prompts/{id}/releases` - 创建发布
-- `GET /v1/detail/git/branches` - 列出分支
-- `POST /v1/detail/git/checkout` - 切换分支
-- `POST /v1/detail/git/tag` - 创建标签
+- `GET .../history`：查看文件提交历史
+- `GET .../diff`：比较任意两个引用（SHA/分支/标签）
+- `GET .../raw` / `PUT .../raw`：读取或写入原始 Markdown（带 ETag 校验）
+- `GET .../releases` / `POST .../releases`：列出或创建版本标签
+- `GET /v1/detail/git/branches`：列出分支
+- `POST /v1/detail/git/checkout`：切换/创建分支
+- `POST /v1/detail/git/tag`：创建轻量或注释标签
 
 ### Common API（共享端点 - `/v1/`）
 
@@ -158,45 +159,37 @@ cd frontend && npm run dev
 - `POST /v1/validate/frontmatter` - 验证 Front Matter
 - `GET /v1/health` - 健康检查
 
+> 更详细的请求/响应示例见 [doc/API_ENDPOINTS.md](doc/API_ENDPOINTS.md)。
+
 ## 架构说明
 
 ### 目录结构
 
 ```
 MyPromptManager/
-├── config/                 # Django 配置
 ├── apps/
-│   ├── core/              # 核心服务层
-│   │   ├── services/      # Git、索引、版本管理服务
-│   │   └── utils/         # 工具函数
-│   ├── api_simple/        # Simple API
-│   ├── api_detail/        # Detail API
-│   └── api_common/        # 共享 API
-├── frontend/              # React 前端应用
+│   ├── api_common/        # 共享 API（搜索、索引、Schema）
+│   ├── api_detail/        # 技术版 API
+│   ├── api_simple/        # 简化版 API
+│   └── core/              # Git / Index / Version 服务
+├── config/                # Django 配置
+├── doc/                   # 深入文档与迁移笔记
+├── frontend/              # React + Vite 前端
 │   ├── src/
-│   │   ├── components/   # React 组件
-│   │   ├── pages/        # 页面组件
-│   │   ├── lib/          # 工具库和 API 客户端
-│   │   └── App.jsx       # 主应用组件
-│   ├── index.html
-│   ├── package.json
-│   └── vite.config.js
-├── repo_root/             # Git 仓库（存储提示词数据）
-│   ├── .git/             # Git 仓库
-│   ├── .promptmeta/      # 索引和元数据
-│   └── projects/         # 项目数据
-│       └── default/
-│           ├── prompts/  # 提示词文件
-│           ├── templates/# 模版文件
-│           └── chats/    # 对话历史
+│   └── package.json
+├── repo_root/             # 默认 Git 仓库（可通过 GIT_REPO_ROOT 覆盖）
+│   ├── .git/
+│   ├── .promptmeta/
+│   │   └── index.json
+│   ├── prompts/
+│   └── templates/
 ├── schemas/               # JSON Schema 定义
+├── start-frontend.sh      # 前端启动脚本
+├── test_api_endpoints.py  # API 冒烟测试
+├── generate_test_data.py  # （可选）示例数据脚本
+├── manage.py              # Django 管理脚本
 ├── requirements.txt       # Python 依赖
-├── manage.py             # Django 管理脚本
-├── generate_test_data.py  # 测试数据生成脚本 ⭐
-├── verify_test_data.sh    # 测试数据验证脚本 ⭐
-├── demo_test_data.sh      # 测试数据演示脚本 ⭐
-├── README.md             # 项目文档
-└── TEST_DATA_README.md    # 测试数据说明 ⭐
+└── README.md
 ```
 
 ### 技术栈
@@ -224,7 +217,6 @@ id: 01HQXYZ123ABC456DEF789
 title: My Awesome Prompt
 description: A helpful prompt for...
 type: prompt
-project: default
 slug: my-awesome-prompt
 labels:
   - ai
@@ -238,6 +230,8 @@ updated_at: 2024-01-01T00:00:00Z
 
 Your prompt content goes here...
 ```
+
+可根据需要在 Front Matter 中扩展自定义字段（如 project、locale 等），索引服务会保留未知字段。
 
 #### Git 标签命名
 
@@ -278,8 +272,11 @@ GIT_DEFAULT_BRANCH=main
 ### 运行测试
 
 ```bash
-python manage.py test
+python test_api_endpoints.py  # 快速验证路由与视图 wiring
+python manage.py test         # 运行 Django 测试用例
 ```
+
+`test_api_endpoints.py` 使用 `RequestFactory` 检查 prompt / template 分支是否都能被各个视图接受，可在实现新端点后先跑一遍冒烟测试。
 
 ### 代码规范
 

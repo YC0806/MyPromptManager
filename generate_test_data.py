@@ -20,11 +20,9 @@ def generate_ulid():
 
 # 配置
 REPO_ROOT = Path(__file__).parent / 'repo_root'
-PROJECTS_DIR = REPO_ROOT / 'projects'
-DEFAULT_PROJECT = PROJECTS_DIR / 'default'
-PROMPTS_DIR = DEFAULT_PROJECT / 'prompts'
-TEMPLATES_DIR = DEFAULT_PROJECT / 'templates'
-CHATS_DIR = DEFAULT_PROJECT / 'chats'
+PROMPTS_DIR = REPO_ROOT / 'prompts'
+TEMPLATES_DIR = REPO_ROOT / 'templates'
+CHATS_DIR = REPO_ROOT / 'chats'
 PROMPTMETA_DIR = REPO_ROOT / '.promptmeta'
 INDEX_FILE = PROMPTMETA_DIR / 'index.json'
 
