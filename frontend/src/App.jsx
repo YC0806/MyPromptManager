@@ -5,6 +5,8 @@ import Topbar from './components/layout/Topbar'
 import Dashboard from './pages/Dashboard'
 import PromptsList from './pages/PromptsList'
 import PromptDetail from './pages/PromptDetail'
+import TemplatesList from './pages/TemplatesList'
+import TemplateDetail from './pages/TemplateDetail'
 import Releases from './pages/Releases'
 import Timeline from './pages/Timeline'
 import RepoAdvanced from './pages/RepoAdvanced'
@@ -29,7 +31,8 @@ function App() {
               <Route path="/" element={<Dashboard />} />
               <Route path="/prompts" element={<PromptsList />} />
               <Route path="/prompts/:id" element={<PromptDetail />} />
-              <Route path="/templates" element={<PromptsList />} />
+              <Route path="/templates" element={<TemplatesList />} />
+              <Route path="/templates/:id" element={<TemplateDetail />} />
               <Route path="/chats" element={<PromptsList />} />
               <Route path="/releases" element={<Releases />} />
               <Route path="/timeline" element={<Timeline />} />

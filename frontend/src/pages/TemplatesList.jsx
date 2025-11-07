@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { FileText, LayoutGrid, List, MoreVertical, Plus } from 'lucide-react'
+import { FileCode, LayoutGrid, List, MoreVertical, Plus } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
@@ -30,10 +30,10 @@ import useStore from '@/store/useStore'
 import { commonApi } from '@/lib/api'
 import { formatDate, getLabelColor, getStatusColor } from '@/lib/utils'
 
-export default function PromptsList() {
+export default function TemplatesList() {
   const navigate = useNavigate()
   const { viewMode, setViewMode, mode } = useStore()
-  const [prompts, setPrompts] = useState([])
+  const [templates, setTemplates] = useState([])
   const [loading, setLoading] = useState(true)
   const [filters, setFilters] = useState({
     label: '',
@@ -41,20 +41,20 @@ export default function PromptsList() {
   })
 
   useEffect(() => {
-    loadPrompts()
+    loadTemplates()
   }, [filters])
 
-  const loadPrompts = async () => {
+  const loadTemplates = async () => {
     try {
       setLoading(true)
       const response = await commonApi.search({
-        type: 'prompt', // Only fetch prompts
+        type: 'template', // Only fetch templates
         labels: filters.label || undefined,
         author: filters.author || undefined,
       })
-      setPrompts(response.data.results || [])
+      setTemplates(response.data.results || [])
     } catch (error) {
-      console.error('Failed to load prompts:', error)
+      console.error('Failed to load templates:', error)
     } finally {
       setLoading(false)
     }
@@ -62,7 +62,7 @@ export default function PromptsList() {
 
   const breadcrumbItems = [
     { label: 'Home', href: '/' },
-    { label: 'Prompts' },
+    { label: 'Templates' },
   ]
 
   return (
@@ -73,12 +73,15 @@ export default function PromptsList() {
         {/* Page Header */}
         <div className="flex items-center justify-between mb-8">
           <div>
-            <h1 className="text-3xl font-bold text-zinc-900">Prompts</h1>
-            <p className="text-zinc-600 mt-1">Manage your prompt templates and versions</p>
+            <div className="flex items-center gap-3">
+              <FileCode className="w-8 h-8 text-purple-500" />
+              <h1 className="text-3xl font-bold text-zinc-900">Templates</h1>
+            </div>
+            <p className="text-zinc-600 mt-1">Manage your reusable template files with variables</p>
           </div>
-          <Button className="bg-teal-500 hover:bg-teal-600">
+          <Button className="bg-purple-500 hover:bg-purple-600">
             <Plus className="w-4 h-4 mr-2" />
-            New Prompt
+            New Template
           </Button>
         </div>
 
@@ -132,19 +135,19 @@ export default function PromptsList() {
         {/* Content */}
         {loading ? (
           <div className="flex items-center justify-center h-64">
-            <p className="text-zinc-500">Loading prompts...</p>
+            <p className="text-zinc-500">Loading templates...</p>
           </div>
         ) : viewMode === 'table' ? (
-          <TableView prompts={prompts} onSelect={(prompt) => navigate(`/prompts/${prompt.id}`)} />
+          <TableView templates={templates} onSelect={(template) => navigate(`/templates/${template.id}`)} />
         ) : (
-          <CardsView prompts={prompts} onSelect={(prompt) => navigate(`/prompts/${prompt.id}`)} />
+          <CardsView templates={templates} onSelect={(template) => navigate(`/templates/${template.id}`)} />
         )}
       </div>
     </div>
   )
 }
 
-function TableView({ prompts, onSelect }) {
+function TableView({ templates, onSelect }) {
   return (
     <div className="bg-white rounded-lg shadow-sm overflow-hidden">
       <table className="w-full">
@@ -174,41 +177,41 @@ function TableView({ prompts, onSelect }) {
           </tr>
         </thead>
         <tbody className="divide-y">
-          {prompts.map((prompt) => (
+          {templates.map((template) => (
             <tr
-              key={prompt.id}
+              key={template.id}
               className="hover:bg-zinc-50 transition-colors duration-200 cursor-pointer"
-              onClick={() => onSelect(prompt)}
+              onClick={() => onSelect(template)}
             >
               <td className="px-6 py-4">
                 <div className="flex items-center gap-3">
-                  <FileText className="w-5 h-5 text-teal-500" />
+                  <FileCode className="w-5 h-5 text-purple-500" />
                   <div>
-                    <p className="font-semibold text-zinc-900">{prompt.title}</p>
-                    <p className="text-xs text-zinc-500">{prompt.slug}</p>
+                    <p className="font-semibold text-zinc-900">{template.title}</p>
+                    <p className="text-xs text-zinc-500">{template.slug}</p>
                   </div>
                 </div>
               </td>
               <td className="px-6 py-4">
                 <div className="flex gap-1 flex-wrap">
-                  {prompt.labels?.slice(0, 3).map((label, idx) => (
+                  {template.labels?.slice(0, 3).map((label, idx) => (
                     <Badge key={idx} className={getLabelColor(idx)}>
                       {label}
                     </Badge>
                   ))}
-                  {prompt.labels?.length > 3 && (
-                    <Badge variant="outline">+{prompt.labels.length - 3}</Badge>
+                  {template.labels?.length > 3 && (
+                    <Badge variant="outline">+{template.labels.length - 3}</Badge>
                   )}
                 </div>
               </td>
               <td className="px-6 py-4">
-                {prompt.latestRelease ? (
+                {template.latestRelease ? (
                   <div className="flex items-center gap-2">
                     <Badge variant="outline" className="font-mono text-xs">
-                      {prompt.latestRelease.version}
+                      {template.latestRelease.version}
                     </Badge>
-                    <Badge variant={prompt.latestRelease.channel === 'prod' ? 'success' : 'secondary'}>
-                      {prompt.latestRelease.channel}
+                    <Badge variant={template.latestRelease.channel === 'prod' ? 'success' : 'secondary'}>
+                      {template.latestRelease.channel}
                     </Badge>
                   </div>
                 ) : (
@@ -216,13 +219,13 @@ function TableView({ prompts, onSelect }) {
                 )}
               </td>
               <td className="px-6 py-4">
-                <StatusBadge status={prompt.draftStatus || 'in_sync'} />
+                <StatusBadge status={template.draftStatus || 'in_sync'} />
               </td>
               <td className="px-6 py-4 text-sm text-zinc-600">
-                {formatDate(prompt.updated_at)}
+                {formatDate(template.updated_at)}
               </td>
               <td className="px-6 py-4 text-sm text-zinc-600">
-                @{prompt.author}
+                @{template.author}
               </td>
               <td className="px-6 py-4 text-right">
                 <DropdownMenu>
@@ -243,27 +246,27 @@ function TableView({ prompts, onSelect }) {
           ))}
         </tbody>
       </table>
-      {prompts.length === 0 && (
+      {templates.length === 0 && (
         <div className="text-center py-12 text-zinc-500">
-          No prompts found. Create your first prompt to get started!
+          No templates found. Create your first template to get started!
         </div>
       )}
     </div>
   )
 }
 
-function CardsView({ prompts, onSelect }) {
+function CardsView({ templates, onSelect }) {
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-      {prompts.map((prompt) => (
+      {templates.map((template) => (
         <Card
-          key={prompt.id}
-          className="hover:shadow-md transition-shadow duration-200 cursor-pointer"
-          onClick={() => onSelect(prompt)}
+          key={template.id}
+          className="hover:shadow-md transition-shadow duration-200 cursor-pointer border-l-4 border-l-purple-500"
+          onClick={() => onSelect(template)}
         >
           <CardHeader>
             <div className="flex items-start justify-between">
-              <FileText className="w-8 h-8 text-teal-500" />
+              <FileCode className="w-8 h-8 text-purple-500" />
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button variant="ghost" size="icon" onClick={(e) => e.stopPropagation()}>
@@ -278,45 +281,46 @@ function CardsView({ prompts, onSelect }) {
                 </DropdownMenuContent>
               </DropdownMenu>
             </div>
-            <CardTitle className="mt-2">{prompt.title}</CardTitle>
+            <CardTitle className="mt-2">{template.title}</CardTitle>
             <div className="flex gap-2 mt-2 flex-wrap">
-              {prompt.labels?.slice(0, 3).map((label, idx) => (
+              {template.labels?.slice(0, 3).map((label, idx) => (
                 <Badge key={idx} className={getLabelColor(idx)}>
                   {label}
                 </Badge>
               ))}
+              <Badge className="bg-purple-100 text-purple-700 text-xs">Template</Badge>
             </div>
           </CardHeader>
           <CardContent>
             <CardDescription className="line-clamp-2">
-              {prompt.description || 'No description'}
+              {template.description || 'No description'}
             </CardDescription>
             <div className="mt-4 flex justify-between items-center">
-              {prompt.latestRelease ? (
+              {template.latestRelease ? (
                 <div className="flex items-center gap-2">
                   <span className="text-xs text-zinc-500 font-mono">
-                    {prompt.latestRelease.version}
+                    {template.latestRelease.version}
                   </span>
                   <Badge variant="outline" className="text-xs">
-                    {prompt.latestRelease.channel}
+                    {template.latestRelease.channel}
                   </Badge>
                 </div>
               ) : (
                 <span className="text-xs text-zinc-400">No releases</span>
               )}
-              <StatusBadge status={prompt.draftStatus || 'in_sync'} />
+              <StatusBadge status={template.draftStatus || 'in_sync'} />
             </div>
           </CardContent>
           <CardFooter className="text-xs text-zinc-500">
-            <span>Updated {formatDate(prompt.updated_at)}</span>
+            <span>Updated {formatDate(template.updated_at)}</span>
             <span className="mx-2">•</span>
-            <span>@{prompt.author}</span>
+            <span>@{template.author}</span>
           </CardFooter>
         </Card>
       ))}
-      {prompts.length === 0 && (
+      {templates.length === 0 && (
         <div className="col-span-full text-center py-12 text-zinc-500">
-          No prompts found. Create your first prompt to get started!
+          No templates found. Create your first template to get started!
         </div>
       )}
     </div>

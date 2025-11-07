@@ -21,7 +21,7 @@ import {
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { simpleApi } from '@/lib/api'
 
-export default function PublishModal({ open, onClose, promptId }) {
+export default function PublishModal({ open, onClose, promptId, itemType = 'prompt' }) {
   const [channel, setChannel] = useState('prod')
   const [versionType, setVersionType] = useState('auto')
   const [notes, setNotes] = useState('')
@@ -30,7 +30,7 @@ export default function PublishModal({ open, onClose, promptId }) {
   const handlePublish = async () => {
     try {
       setPublishing(true)
-      await simpleApi.publish(promptId, {
+      await simpleApi.publish(promptId, itemType, {
         channel,
         version: versionType,
         notes,

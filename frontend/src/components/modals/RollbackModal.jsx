@@ -21,7 +21,7 @@ import { Card, CardContent } from '@/components/ui/card'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { simpleApi } from '@/lib/api'
 
-export default function RollbackModal({ open, onClose, promptId }) {
+export default function RollbackModal({ open, onClose, promptId, itemType = 'prompt' }) {
   const [targetVersion, setTargetVersion] = useState('')
   const [strategy, setStrategy] = useState('revert_and_publish')
   const [rolling, setRolling] = useState(false)
@@ -29,7 +29,7 @@ export default function RollbackModal({ open, onClose, promptId }) {
   const handleRollback = async () => {
     try {
       setRolling(true)
-      await simpleApi.rollback(promptId, {
+      await simpleApi.rollback(promptId, itemType, {
         to_version: targetVersion,
         strategy,
       })

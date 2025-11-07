@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react'
-import { useParams } from 'react-router-dom'
-import { Save, Send, History, RotateCcw } from 'lucide-react'
+import { useParams, useNavigate } from 'react-router-dom'
+import { Save, Send, History, RotateCcw, FileCode } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -15,42 +15,47 @@ import RollbackModal from '@/components/modals/RollbackModal'
 import useStore from '@/store/useStore'
 import { simpleApi, detailApi } from '@/lib/api'
 
-export default function PromptDetail() {
+export default function TemplateDetail() {
   const { id } = useParams()
+  const navigate = useNavigate()
   const { mode } = useStore()
   const [content, setContent] = useState('')
   const [metadata, setMetadata] = useState({
     title: '',
     description: '',
     labels: [],
+    type: 'template',
+    variables: [], // Template-specific: variable definitions
   })
   const [saving, setSaving] = useState(false)
   const [showPublishModal, setShowPublishModal] = useState(false)
   const [showRollbackModal, setShowRollbackModal] = useState(false)
 
   useEffect(() => {
-    loadPrompt()
+    loadTemplate()
   }, [id])
 
-  const loadPrompt = async () => {
+  const loadTemplate = async () => {
     try {
-      const response = await simpleApi.getContent(id, 'prompt', { ref: 'latest' })
+      const response = await simpleApi.getContent(id, 'template', { ref: 'latest' })
       const data = response.data
       setContent(data.content || '')
       setMetadata({
         title: data.metadata?.title || '',
         description: data.metadata?.description || '',
         labels: data.metadata?.labels || [],
+        type: 'template',
+        variables: data.metadata?.variables || [],
       })
     } catch (error) {
-      console.error('Failed to load prompt:', error)
+      console.error('Failed to load template:', error)
     }
   }
 
   const handleSave = async () => {
     try {
       setSaving(true)
-      await simpleApi.saveDraft(id, 'prompt', {
+      await simpleApi.saveDraft(id, 'template', {
         content,
         message: 'Draft saved',
       })
@@ -64,7 +69,7 @@ export default function PromptDetail() {
 
   const breadcrumbItems = [
     { label: 'Home', href: '/' },
-    { label: 'Prompts', href: '/prompts' },
+    { label: 'Templates', href: '/templates' },
     { label: metadata.title || 'Untitled' },
   ]
 
@@ -81,10 +86,14 @@ export default function PromptDetail() {
         {/* Header Actions */}
         <div className="flex items-center justify-between mb-6">
           <div>
-            <h1 className="text-3xl font-bold text-zinc-900">{metadata.title}</h1>
+            <div className="flex items-center gap-3">
+              <FileCode className="w-8 h-8 text-purple-500" />
+              <h1 className="text-3xl font-bold text-zinc-900">{metadata.title}</h1>
+            </div>
             <div className="flex gap-2 mt-2">
               <Badge variant="success">v1.0.0</Badge>
               <Badge variant="outline">prod</Badge>
+              <Badge className="bg-purple-100 text-purple-700">Template</Badge>
             </div>
           </div>
           <div className="flex gap-2">
@@ -92,11 +101,11 @@ export default function PromptDetail() {
               <Save className="w-4 h-4 mr-2" />
               {saving ? 'Saving...' : 'Save'}
             </Button>
-            <Button className="bg-teal-500 hover:bg-teal-600" onClick={() => setShowPublishModal(true)}>
+            <Button className="bg-purple-500 hover:bg-purple-600" onClick={() => setShowPublishModal(true)}>
               <Send className="w-4 h-4 mr-2" />
               Publish
             </Button>
-            <Button variant="outline" onClick={() => navigate('/prompts/' + id + '/compare')}>
+            <Button variant="outline" onClick={() => navigate('/templates/' + id + '/compare')}>
               <History className="w-4 h-4 mr-2" />
               Compare
             </Button>
@@ -127,35 +136,63 @@ export default function PromptDetail() {
       </div>
 
       {/* Modals */}
-      <PublishModal open={showPublishModal} onClose={() => setShowPublishModal(false)} promptId={id} itemType="prompt" />
-      <RollbackModal open={showRollbackModal} onClose={() => setShowRollbackModal(false)} promptId={id} itemType="prompt" />
+      <PublishModal open={showPublishModal} onClose={() => setShowPublishModal(false)} promptId={id} itemType="template" />
+      <RollbackModal open={showRollbackModal} onClose={() => setShowRollbackModal(false)} promptId={id} itemType="template" />
     </div>
   )
 }
 
 function SimpleMode({ content, setContent, metadata, setMetadata }) {
+  // Extract variables from template content (e.g., {{variable_name}})
+  const extractVariables = (text) => {
+    const regex = /\{\{(\w+)\}\}/g
+    const matches = [...text.matchAll(regex)]
+    return [...new Set(matches.map(m => m[1]))]
+  }
+
+  const detectedVariables = extractVariables(content)
+
   return (
     <div className="grid grid-cols-12 gap-6">
       {/* Editor (7/12) */}
       <div className="col-span-7">
         <Card>
           <CardHeader>
-            <CardTitle>Content Editor</CardTitle>
-            <CardDescription>Edit your prompt content in Markdown</CardDescription>
+            <CardTitle>Template Editor</CardTitle>
+            <CardDescription>Edit your template content with variables like {`{{variable_name}}`}</CardDescription>
           </CardHeader>
           <CardContent>
             <Textarea
               value={content}
               onChange={(e) => setContent(e.target.value)}
               className="min-h-[500px] font-mono text-sm"
-              placeholder="Enter your prompt content here..."
+              placeholder="Enter your template content here... Use {{variable_name}} for variables."
             />
             <div className="flex items-center justify-between mt-4 text-xs text-zinc-500">
-              <span>Words: {content.split(/\s+/).length} | Paragraphs: {content.split('\n\n').length}</span>
+              <span>Words: {content.split(/\s+/).length} | Variables: {detectedVariables.length}</span>
               <span>⚡ Auto-save enabled</span>
             </div>
           </CardContent>
         </Card>
+
+        {/* Variables Preview */}
+        {detectedVariables.length > 0 && (
+          <Card className="mt-6">
+            <CardHeader>
+              <CardTitle className="text-lg">Detected Variables</CardTitle>
+              <CardDescription>Variables found in your template</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="flex flex-wrap gap-2">
+                {detectedVariables.map((variable, idx) => (
+                  <Badge key={idx} variant="outline" className="font-mono">
+                    {`{{${variable}}}`}
+                  </Badge>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        )}
       </div>
 
       {/* Inspector (5/12) */}
@@ -194,6 +231,38 @@ function SimpleMode({ content, setContent, metadata, setMetadata }) {
                 ))}
                 <Button variant="outline" size="sm">+ Add</Button>
               </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>🔧 Template Variables</CardTitle>
+            <CardDescription>Define variable descriptions and defaults</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-3">
+              {detectedVariables.length > 0 ? (
+                detectedVariables.map((variable, idx) => (
+                  <div key={idx} className="p-3 bg-zinc-50 rounded-lg">
+                    <div className="font-mono text-sm font-semibold text-purple-600 mb-1">
+                      {`{{${variable}}}`}
+                    </div>
+                    <Input
+                      placeholder="Description..."
+                      className="text-xs mb-2"
+                      size="sm"
+                    />
+                    <Input
+                      placeholder="Default value..."
+                      className="text-xs"
+                      size="sm"
+                    />
+                  </div>
+                ))
+              ) : (
+                <p className="text-sm text-zinc-500">No variables detected yet. Add {`{{variable_name}}`} to your template.</p>
+              )}
             </div>
           </CardContent>
         </Card>

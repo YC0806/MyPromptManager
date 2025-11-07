@@ -15,24 +15,28 @@ from apps.core.exceptions import ResourceNotFoundError, ValidationError
 class HistoryView(APIView):
     """
     GET /v1/detail/prompts/{id}/history
-    Get full commit history for a prompt.
+    GET /v1/detail/templates/{id}/history
+    Get full commit history for a prompt or template.
     """
 
-    def get(self, request, prompt_id):
+    def get(self, request, prompt_id=None, template_id=None):
+        item_id = prompt_id or template_id
+        item_type = 'prompt' if prompt_id else 'template'
+
         limit = int(request.query_params.get('limit', 100))
         follow_renames = request.query_params.get('follow_renames', 'true') == 'true'
 
         git_service = GitService()
         index_service = IndexService()
 
-        entry = index_service.get_by_id(prompt_id)
+        entry = index_service.get_by_id(item_id)
         if not entry:
-            raise ResourceNotFoundError(f"Prompt {prompt_id} not found")
+            raise ResourceNotFoundError(f"{item_type.capitalize()} {item_id} not found")
 
         history = git_service.get_file_history(entry['file_path'], limit=limit)
 
         return Response({
-            'prompt_id': prompt_id,
+            f'{item_type}_id': item_id,
             'file_path': entry['file_path'],
             'history': history,
             'count': len(history),
@@ -42,10 +46,14 @@ class HistoryView(APIView):
 class DiffView(APIView):
     """
     GET /v1/detail/prompts/{id}/diff
+    GET /v1/detail/templates/{id}/diff
     Get diff between two references.
     """
 
-    def get(self, request, prompt_id):
+    def get(self, request, prompt_id=None, template_id=None):
+        item_id = prompt_id or template_id
+        item_type = 'prompt' if prompt_id else 'template'
+
         from_ref = request.query_params.get('from')
         to_ref = request.query_params.get('to')
 
@@ -55,9 +63,9 @@ class DiffView(APIView):
         git_service = GitService()
         index_service = IndexService()
 
-        entry = index_service.get_by_id(prompt_id)
+        entry = index_service.get_by_id(item_id)
         if not entry:
-            raise ResourceNotFoundError(f"Prompt {prompt_id} not found")
+            raise ResourceNotFoundError(f"{item_type.capitalize()} {item_id} not found")
 
         diff_result = git_service.diff_files(from_ref, to_ref, entry['file_path'])
 
@@ -67,18 +75,23 @@ class DiffView(APIView):
 class RawContentView(APIView):
     """
     GET /v1/detail/prompts/{id}/raw - Read raw markdown
+    GET /v1/detail/templates/{id}/raw - Read raw markdown
     PUT /v1/detail/prompts/{id}/raw - Write raw markdown
+    PUT /v1/detail/templates/{id}/raw - Write raw markdown
     """
 
-    def get(self, request, prompt_id):
+    def get(self, request, prompt_id=None, template_id=None):
+        item_id = prompt_id or template_id
+        item_type = 'prompt' if prompt_id else 'template'
+
         ref = request.query_params.get('ref', 'main')
 
         git_service = GitService()
         index_service = IndexService()
 
-        entry = index_service.get_by_id(prompt_id)
+        entry = index_service.get_by_id(item_id)
         if not entry:
-            raise ResourceNotFoundError(f"Prompt {prompt_id} not found")
+            raise ResourceNotFoundError(f"{item_type.capitalize()} {item_id} not found")
 
         content = git_service.read_file(entry['file_path'], ref if ref != 'main' else None)
 
@@ -90,10 +103,13 @@ class RawContentView(APIView):
             }
         )
 
-    def put(self, request, prompt_id):
+    def put(self, request, prompt_id=None, template_id=None):
+        item_id = prompt_id or template_id
+        item_type = 'prompt' if prompt_id else 'template'
+
         content = request.body.decode('utf-8')
         if_match = request.headers.get('If-Match')
-        message = request.query_params.get('message', f'Update {prompt_id}')
+        message = request.query_params.get('message', f'Update {item_id}')
 
         if not if_match:
             raise ValidationError("If-Match header is required")
@@ -101,9 +117,9 @@ class RawContentView(APIView):
         git_service = GitService()
         index_service = IndexService()
 
-        entry = index_service.get_by_id(prompt_id)
+        entry = index_service.get_by_id(item_id)
         if not entry:
-            raise ResourceNotFoundError(f"Prompt {prompt_id} not found")
+            raise ResourceNotFoundError(f"{item_type.capitalize()} {item_id} not found")
 
         # Check ETag
         current_sha = git_service.get_file_sha(entry['file_path'])
@@ -124,7 +140,7 @@ class RawContentView(APIView):
 
         # Update index
         metadata, _ = parse_frontmatter(content)
-        index_service.add_or_update(prompt_id, metadata, entry['file_path'], commit_sha)
+        index_service.add_or_update(item_id, metadata, entry['file_path'], commit_sha)
 
         return Response({
             'sha': commit_sha,
@@ -135,13 +151,18 @@ class RawContentView(APIView):
 class ReleasesView(APIView):
     """
     GET /v1/detail/prompts/{id}/releases - List releases
+    GET /v1/detail/templates/{id}/releases - List releases
     POST /v1/detail/prompts/{id}/releases - Create release
+    POST /v1/detail/templates/{id}/releases - Create release
     """
 
-    def get(self, request, prompt_id):
+    def get(self, request, prompt_id=None, template_id=None):
+        item_id = prompt_id or template_id
+        item_type = 'prompt' if prompt_id else 'template'
+
         git_service = GitService()
 
-        tag_prefix = f"prompt/{prompt_id}/"
+        tag_prefix = f"{item_type}/{item_id}/"
         tags = git_service.list_tags(prefix=tag_prefix)
 
         releases = []
@@ -165,12 +186,15 @@ class ReleasesView(APIView):
         )
 
         return Response({
-            'prompt_id': prompt_id,
+            f'{item_type}_id': item_id,
             'releases': releases,
             'count': len(releases),
         })
 
-    def post(self, request, prompt_id):
+    def post(self, request, prompt_id=None, template_id=None):
+        item_id = prompt_id or template_id
+        item_type = 'prompt' if prompt_id else 'template'
+
         base_sha = request.data.get('base_sha')
         version = request.data.get('version')
         channel = request.data.get('channel', 'prod')
@@ -186,7 +210,7 @@ class ReleasesView(APIView):
         VersionService.parse_version(version)
 
         # Create tag
-        tag_name = VersionService.build_tag_name(prompt_id, version)
+        tag_name = VersionService.build_tag_name(item_id, version)
         tag_message = VersionService.create_release_metadata(
             version, channel, notes, base_sha, **payload
         )

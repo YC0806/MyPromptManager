@@ -18,10 +18,14 @@ from apps.core.exceptions import ResourceNotFoundError, ConflictError, Validatio
 class TimelineView(APIView):
     """
     GET /v1/simple/prompts/{id}/timeline
-    Get timeline of releases and drafts for a prompt.
+    GET /v1/simple/templates/{id}/timeline
+    Get timeline of releases and drafts for a prompt or template.
     """
 
-    def get(self, request, prompt_id):
+    def get(self, request, prompt_id=None, template_id=None):
+        item_id = prompt_id or template_id
+        item_type = 'prompt' if prompt_id else 'template'
+
         view_mode = request.query_params.get('view', 'releases')
         limit = int(request.query_params.get('limit', 50))
         cursor = request.query_params.get('cursor')
@@ -30,14 +34,14 @@ class TimelineView(APIView):
         index_service = IndexService()
 
         # Get index entry to find file path
-        entry = index_service.get_by_id(prompt_id)
+        entry = index_service.get_by_id(item_id)
         if not entry:
-            raise ResourceNotFoundError(f"Prompt {prompt_id} not found")
+            raise ResourceNotFoundError(f"{item_type.capitalize()} {item_id} not found")
 
         file_path = entry['file_path']
 
         # Get tags (releases)
-        tag_prefix = f"{settings.VERSION_TAG_PREFIX}/{prompt_id}/"
+        tag_prefix = f"{settings.VERSION_TAG_PREFIX}/{item_id}/"
         tags = git_service.list_tags(prefix=tag_prefix)
 
         timeline = []
@@ -76,7 +80,7 @@ class TimelineView(APIView):
         timeline.sort(key=lambda x: x.get('released_at') or x.get('timestamp'), reverse=True)
 
         return Response({
-            'prompt_id': prompt_id,
+            f'{item_type}_id': item_id,
             'timeline': timeline[:limit],
         })
 
@@ -84,26 +88,30 @@ class TimelineView(APIView):
 class ContentView(APIView):
     """
     GET /v1/simple/prompts/{id}/content
+    GET /v1/simple/templates/{id}/content
     Get content of a specific version.
     """
 
-    def get(self, request, prompt_id):
+    def get(self, request, prompt_id=None, template_id=None):
+        item_id = prompt_id or template_id
+        item_type = 'prompt' if prompt_id else 'template'
+
         ref = request.query_params.get('ref', 'latest')
 
         git_service = GitService()
         index_service = IndexService()
 
         # Get index entry
-        entry = index_service.get_by_id(prompt_id)
+        entry = index_service.get_by_id(item_id)
         if not entry:
-            raise ResourceNotFoundError(f"Prompt {prompt_id} not found")
+            raise ResourceNotFoundError(f"{item_type.capitalize()} {item_id} not found")
 
         file_path = entry['file_path']
 
         # Resolve ref
         if ref == 'latest':
             # Get latest release tag
-            tag_prefix = f"{settings.VERSION_TAG_PREFIX}/{prompt_id}/"
+            tag_prefix = f"{settings.VERSION_TAG_PREFIX}/{item_id}/"
             tags = git_service.list_tags(prefix=tag_prefix)
             versions = [t['name'].replace(tag_prefix, '') for t in tags]
             latest_version = VersionService.get_latest_version(versions)
@@ -116,7 +124,7 @@ class ContentView(APIView):
 
         elif ref.startswith('v'):
             # Version string, build tag name
-            ref = VersionService.build_tag_name(prompt_id, ref)
+            ref = VersionService.build_tag_name(item_id, ref)
 
         # Read content
         content = git_service.read_file(file_path, ref)
@@ -124,7 +132,7 @@ class ContentView(APIView):
         metadata, body = parse_frontmatter(content)
 
         return Response({
-            'prompt_id': prompt_id,
+            f'{item_type}_id': item_id,
             'ref': ref,
             'content': content,
             'metadata': metadata,
@@ -135,10 +143,14 @@ class ContentView(APIView):
 class SaveDraftView(APIView):
     """
     POST /v1/simple/prompts/{id}/save
+    POST /v1/simple/templates/{id}/save
     Save draft to hidden UI branch.
     """
 
-    def post(self, request, prompt_id):
+    def post(self, request, prompt_id=None, template_id=None):
+        item_id = prompt_id or template_id
+        item_type = 'prompt' if prompt_id else 'template'
+
         content = request.data.get('content')
         message = request.data.get('message', 'Draft save')
         idempotency_key = request.data.get('idempotency_key')
@@ -150,20 +162,20 @@ class SaveDraftView(APIView):
         index_service = IndexService()
 
         # Get or create entry
-        entry = index_service.get_by_id(prompt_id)
+        entry = index_service.get_by_id(item_id)
 
         if entry:
             file_path = entry['file_path']
         else:
-            # New prompt, create file path
+            # New item, create file path
             metadata, body = parse_frontmatter(content)
-            item_type = metadata.get('type', 'prompt')
-            file_path = f"{item_type}s/{item_type}_{prompt_id}.md"
+            content_type = metadata.get('type', item_type)
+            file_path = f"{content_type}s/{content_type}_{item_id}.md"
 
         # Create UI branch for this user/session
         user = request.user.username if request.user.is_authenticated else 'anonymous'
         session_id = idempotency_key or str(uuid.uuid4())[:8]
-        ui_branch = f"ui/{user}/{prompt_id}/{session_id}"
+        ui_branch = f"ui/{user}/{item_id}/{session_id}"
 
         # Checkout or create UI branch
         try:
@@ -172,7 +184,7 @@ class SaveDraftView(APIView):
             pass
 
         # Write file
-        commit_message = f"Save draft for {prompt_id}: {message}"
+        commit_message = f"Save draft for {item_id}: {message}"
         sha = git_service.write_file(
             file_path,
             content,
@@ -203,10 +215,14 @@ class SaveDraftView(APIView):
 class PublishView(APIView):
     """
     POST /v1/simple/prompts/{id}/publish
+    POST /v1/simple/templates/{id}/publish
     Publish a version (merge UI branch and create tag).
     """
 
-    def post(self, request, prompt_id):
+    def post(self, request, prompt_id=None, template_id=None):
+        item_id = prompt_id or template_id
+        item_type = 'prompt' if prompt_id else 'template'
+
         base_sha = request.data.get('base_sha')
         channel = request.data.get('channel', 'prod')
         version = request.data.get('version', 'auto')
@@ -220,16 +236,16 @@ class PublishView(APIView):
         index_service = IndexService()
 
         # Get entry
-        entry = index_service.get_by_id(prompt_id)
+        entry = index_service.get_by_id(item_id)
         if not entry:
-            raise ResourceNotFoundError(f"Prompt {prompt_id} not found")
+            raise ResourceNotFoundError(f"{item_type.capitalize()} {item_id} not found")
 
         file_path = entry['file_path']
 
         # Determine version
         if version == 'auto':
             # Get latest version
-            tag_prefix = f"{settings.VERSION_TAG_PREFIX}/{prompt_id}/"
+            tag_prefix = f"{settings.VERSION_TAG_PREFIX}/{item_id}/"
             tags = git_service.list_tags(prefix=tag_prefix)
             versions = [t['name'].replace(tag_prefix, '') for t in tags]
             current_version = VersionService.get_latest_version(versions) or 'v0.0.0'
@@ -257,12 +273,12 @@ class PublishView(APIView):
         commit_sha = git_service.write_file(
             file_path,
             content,
-            f"Release {prompt_id} {version}: {notes}",
+            f"Release {item_id} {version}: {notes}",
             author="release-bot <release-bot@promptmanager.local>"
         )
 
         # Create release tag
-        tag_name = VersionService.build_tag_name(prompt_id, version)
+        tag_name = VersionService.build_tag_name(item_id, version)
         tag_message = VersionService.create_release_metadata(
             version, channel, notes, commit_sha
         )
@@ -276,7 +292,7 @@ class PublishView(APIView):
 
         # Update index
         metadata, _ = parse_frontmatter(content)
-        index_service.add_or_update(prompt_id, metadata, file_path, commit_sha)
+        index_service.add_or_update(item_id, metadata, file_path, commit_sha)
 
         return Response({
             'type': 'release',
@@ -292,10 +308,14 @@ class PublishView(APIView):
 class CompareView(APIView):
     """
     GET /v1/simple/prompts/{id}/compare
+    GET /v1/simple/templates/{id}/compare
     Compare two versions.
     """
 
-    def get(self, request, prompt_id):
+    def get(self, request, prompt_id=None, template_id=None):
+        item_id = prompt_id or template_id
+        item_type = 'prompt' if prompt_id else 'template'
+
         from_ref = request.query_params.get('from')
         to_ref = request.query_params.get('to', 'latest')
 
@@ -306,14 +326,14 @@ class CompareView(APIView):
         index_service = IndexService()
 
         # Get entry
-        entry = index_service.get_by_id(prompt_id)
+        entry = index_service.get_by_id(item_id)
         if not entry:
-            raise ResourceNotFoundError(f"Prompt {prompt_id} not found")
+            raise ResourceNotFoundError(f"{item_type.capitalize()} {item_id} not found")
 
         file_path = entry['file_path']
 
         # Resolve refs
-        tag_prefix = f"{settings.VERSION_TAG_PREFIX}/{prompt_id}/"
+        tag_prefix = f"{settings.VERSION_TAG_PREFIX}/{item_id}/"
 
         if from_ref.startswith('v'):
             from_ref = f"{tag_prefix}{from_ref}"
@@ -347,7 +367,7 @@ class CompareView(APIView):
                 }
 
         return Response({
-            'prompt_id': prompt_id,
+            f'{item_type}_id': item_id,
             'from_ref': from_ref,
             'to_ref': to_ref,
             'metadata_changes': metadata_changes,
@@ -360,10 +380,14 @@ class CompareView(APIView):
 class RollbackView(APIView):
     """
     POST /v1/simple/prompts/{id}/rollback
+    POST /v1/simple/templates/{id}/rollback
     Rollback to previous version.
     """
 
-    def post(self, request, prompt_id):
+    def post(self, request, prompt_id=None, template_id=None):
+        item_id = prompt_id or template_id
+        item_type = 'prompt' if prompt_id else 'template'
+
         to_version = request.data.get('to_version')
         channel = request.data.get('channel', 'prod')
         strategy = request.data.get('strategy', 'revert_and_publish')
@@ -377,14 +401,14 @@ class RollbackView(APIView):
         index_service = IndexService()
 
         # Get entry
-        entry = index_service.get_by_id(prompt_id)
+        entry = index_service.get_by_id(item_id)
         if not entry:
-            raise ResourceNotFoundError(f"Prompt {prompt_id} not found")
+            raise ResourceNotFoundError(f"{item_type.capitalize()} {item_id} not found")
 
         file_path = entry['file_path']
 
         # Get content from target version
-        tag_prefix = f"{settings.VERSION_TAG_PREFIX}/{prompt_id}/"
+        tag_prefix = f"{settings.VERSION_TAG_PREFIX}/{item_id}/"
         target_ref = f"{tag_prefix}{to_version}"
 
         rollback_content = git_service.read_file(file_path, target_ref)
@@ -401,12 +425,12 @@ class RollbackView(APIView):
         commit_sha = git_service.write_file(
             file_path,
             rollback_content,
-            f"Rollback {prompt_id} to {to_version}: {notes}",
+            f"Rollback {item_id} to {to_version}: {notes}",
             author="release-bot <release-bot@promptmanager.local>"
         )
 
         # Create new release tag
-        tag_name = VersionService.build_tag_name(prompt_id, version)
+        tag_name = VersionService.build_tag_name(item_id, version)
         tag_message = VersionService.create_release_metadata(
             version, channel, notes, commit_sha,
             rollback_from=to_version
@@ -421,7 +445,7 @@ class RollbackView(APIView):
 
         # Update index
         metadata, _ = parse_frontmatter(rollback_content)
-        index_service.add_or_update(prompt_id, metadata, file_path, commit_sha)
+        index_service.add_or_update(item_id, metadata, file_path, commit_sha)
 
         return Response({
             'type': 'release',
