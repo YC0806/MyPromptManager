@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 """
-API 请求模拟脚本
+API 请求模拟脚本 - 适配新的统一API架构
 
 作用：
 1. 读取本地 JSON 测试数据
-2. 依次对 prompt/template/chat 调用创建、更新、发布、删除相关接口
+2. 依次对 prompt/template/chat 调用创建、更新、删除相关接口
 3. 输出每一步的状态，便于快速验证后端 API
 """
 from __future__ import annotations
@@ -23,12 +23,12 @@ except ModuleNotFoundError as exc:  # pragma: no cover - import guard
     ) from exc
 
 
-OPERATIONS = ("create", "update", "publish", "delete")
+OPERATIONS = ("create", "update", "delete")
 RESOURCE_TYPES = ("prompts", "templates", "chats")
 
 
 class ApiRequestSimulator:
-    """负责读取测试数据并依次调用 API。"""
+    """负责读取测试数据并依次调用统一 API。"""
 
     def __init__(
         self,
@@ -72,14 +72,14 @@ class ApiRequestSimulator:
             self._record(resource_type, item["id"], "create", "skipped", "缺少 create 配置")
             return
 
-        content = self._compose_content(resource_type, payload, for_raw=False)
-        url = self._simple_url(resource_type, item["id"], "save")
-        body: Dict[str, Any] = {
-            "content": content,
-            "message": payload.get("message", "create via api script"),
-            "idempotency_key": payload.get("idempotency_key", None),
-        }
+        # 组装内容
+        if resource_type == "chats":
+            body: Dict[str, Any] = payload.get("content", {})
+        else:
+            content = self._compose_content(resource_type, payload)
+            body = {"content": content}
 
+        url = self._resource_url(resource_type)
         resp = self._request("POST", url, json=body)
         if resp is None:
             self._record(resource_type, item["id"], "create", "failed", "HTTP 请求失败")
@@ -87,9 +87,9 @@ class ApiRequestSimulator:
 
         if resp.status_code >= 200 and resp.status_code < 300:
             data = self._safe_json(resp)
-            state["draft_sha"] = data.get("sha")
-            state["ui_branch"] = data.get("ui_branch")
-            detail = f"sha={state.get('draft_sha')} branch={state.get('ui_branch')}"
+            state["item_id"] = data.get("id")
+            state["version_id"] = data.get("version_id")
+            detail = f"id={state.get('item_id')} version={state.get('version_id')}"
             self._record(resource_type, item["id"], "create", "success", detail, resp.status_code)
         else:
             self.failed = True
@@ -108,30 +108,27 @@ class ApiRequestSimulator:
             self._record(resource_type, item["id"], "update", "skipped", "缺少 update 配置")
             return
 
-        raw_content, etag = self._fetch_raw(resource_type, item["id"], payload.get("ref", "main"))
-        if raw_content is None:
-            self._record(resource_type, item["id"], "update", "failed", "读取原始内容失败")
-            self.failed = True
-            return
+        item_id = state.get("item_id") or item["id"]
 
-        new_content = self._compose_content(resource_type, payload, for_raw=True)
-        headers = {}
-        if etag:
-            headers["If-Match"] = etag
+        # 组装更新内容
+        if resource_type == "chats":
+            body: Dict[str, Any] = payload.get("content", {})
+        else:
+            content = self._compose_content(resource_type, payload)
+            body = {"content": content}
 
-        params = {}
-        if payload.get("message"):
-            params["message"] = payload["message"]
-
-        url = self._detail_url(resource_type, item["id"], "raw")
-        resp = self._request("PUT", url, data=new_content.encode("utf-8"), headers=headers, params=params)
+        url = self._resource_url(resource_type, item_id)
+        resp = self._request("PUT", url, json=body)
         if resp is None:
             self._record(resource_type, item["id"], "update", "failed", "HTTP 请求失败")
             self.failed = True
             return
 
         if resp.status_code >= 200 and resp.status_code < 300:
-            self._record(resource_type, item["id"], "update", "success", "内容已写入 main", resp.status_code)
+            data = self._safe_json(resp)
+            state["version_id"] = data.get("version_id")
+            detail = f"new version={state.get('version_id')}"
+            self._record(resource_type, item["id"], "update", "success", detail, resp.status_code)
         else:
             self.failed = True
             self._record(
@@ -143,85 +140,18 @@ class ApiRequestSimulator:
                 resp.status_code,
             )
 
-    def _handle_publish(self, resource_type: str, item: Dict[str, Any], state: Dict[str, Any]) -> None:
-        payload = item.get("publish")
-        if not payload:
-            self._record(resource_type, item["id"], "publish", "skipped", "缺少 publish 配置")
-            return
-
-        base_sha = state.get("draft_sha") or payload.get("base_sha")
-        if not base_sha:
-            self._record(resource_type, item["id"], "publish", "failed", "缺少 base_sha")
-            self.failed = True
-            return
-
-        url = self._simple_url(resource_type, item["id"], "publish")
-        body = {
-            "base_sha": base_sha,
-            "channel": payload.get("channel", "prod"),
-            "version": payload.get("version", "auto"),
-            "notes": payload.get("notes", ""),
-            "idempotency_key": payload.get("idempotency_key"),
-        }
-
-        resp = self._request("POST", url, json=body)
-        if resp is None:
-            self._record(resource_type, item["id"], "publish", "failed", "HTTP 请求失败")
-            self.failed = True
-            return
-
-        if resp.status_code >= 200 and resp.status_code < 300:
-            data = self._safe_json(resp)
-            detail = f"version={data.get('version')} channel={data.get('channel')}"
-            self._record(resource_type, item["id"], "publish", "success", detail, resp.status_code)
-        else:
-            self.failed = True
-            self._record(
-                resource_type,
-                item["id"],
-                "publish",
-                "failed",
-                f"状态码 {resp.status_code} / {resp.text}",
-                resp.status_code,
-            )
-
     def _handle_delete(self, resource_type: str, item: Dict[str, Any], state: Dict[str, Any]) -> None:
-        payload = item.get("delete", {})
-        raw_content, etag = self._fetch_raw(resource_type, item["id"], "main")
-        if raw_content is None:
-            self._record(resource_type, item["id"], "delete", "failed", "无法读取资源内容")
-            self.failed = True
-            return
+        item_id = state.get("item_id") or item["id"]
 
-        url = self._detail_url(resource_type, item["id"], "raw")
-        headers = {}
-        if etag:
-            headers["If-Match"] = etag
-
-        params = {}
-        if payload.get("message"):
-            params["message"] = payload["message"]
-
-        resp = self._request("DELETE", url, headers=headers, params=params)
+        url = self._resource_url(resource_type, item_id)
+        resp = self._request("DELETE", url)
         if resp is None:
             self._record(resource_type, item["id"], "delete", "failed", "HTTP 请求失败")
             self.failed = True
             return
 
-        if resp.status_code == 405:
-            # 当前后端尚未实现 DELETE，标记为跳过
-            self._record(
-                resource_type,
-                item["id"],
-                "delete",
-                "skipped",
-                "后端未实现 DELETE 接口 (405)",
-                resp.status_code,
-            )
-            return
-
         if resp.status_code >= 200 and resp.status_code < 300:
-            self._record(resource_type, item["id"], "delete", "success", "资源删除请求完成", resp.status_code)
+            self._record(resource_type, item["id"], "delete", "success", "资源删除成功", resp.status_code)
         else:
             self.failed = True
             self._record(
@@ -244,30 +174,12 @@ class ApiRequestSimulator:
             print(f"[错误] 请求 {method} {url} 失败: {exc}")
             return None
 
-    def _fetch_raw(self, resource_type: str, item_id: str, ref: str) -> Tuple[Optional[str], Optional[str]]:
-        """获取原始内容与 ETag。"""
-        url = self._detail_url(resource_type, item_id, "raw")
-        resp = self._request("GET", url, params={"ref": ref})
-        if resp is None or resp.status_code >= 400:
-            if resp is not None:
-                print(f"[错误] 拉取 {resource_type} {item_id} 失败: {resp.status_code} {resp.text}")
-            return None, None
-        return resp.text, resp.headers.get("ETag")
-
     def _compose_content(
         self,
         resource_type: str,
         payload: Dict[str, Any],
-        *,
-        for_raw: bool,
-    ) -> Any:
-        """根据资源类型组装 content 字段。"""
-        if resource_type == "chats":
-            content = payload.get("content", {})
-            if for_raw:
-                return json.dumps(content, ensure_ascii=False, indent=2)
-            return content
-
+    ) -> str:
+        """根据资源类型组装 content 字段（Markdown格式）。"""
         if "content" in payload and isinstance(payload["content"], str):
             return payload["content"]
 
@@ -279,16 +191,13 @@ class ApiRequestSimulator:
         frontmatter = json.dumps(metadata, ensure_ascii=False, indent=2)
         body_text = "\n".join(body_lines)
         body_text = body_text.rstrip() + "\n" if body_text else ""
-        markdown = f"---\n{frontmatter}\n---\n\n{body_text}"
-        if for_raw:
-            return markdown
-        return markdown
+        return f"---\n{frontmatter}\n---\n\n{body_text}"
 
-    def _simple_url(self, resource_type: str, item_id: str, action: str) -> str:
-        return f"{self.base_url}/v1/simple/{resource_type}/{item_id}/{action}"
-
-    def _detail_url(self, resource_type: str, item_id: str, action: str) -> str:
-        return f"{self.base_url}/v1/detail/{resource_type}/{item_id}/{action}"
+    def _resource_url(self, resource_type: str, item_id: Optional[str] = None) -> str:
+        """构建统一API的资源URL"""
+        if item_id:
+            return f"{self.base_url}/v1/{resource_type}/{item_id}"
+        return f"{self.base_url}/v1/{resource_type}"
 
     def _safe_json(self, resp: Response) -> Dict[str, Any]:
         try:
