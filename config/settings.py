@@ -26,9 +26,7 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
     'rest_framework',
     'apps.core',
-    'apps.api_simple',
-    'apps.api_detail',
-    'apps.api_common',
+    'apps.api',  # Unified API (replaces api_simple, api_detail, api_common)
 ]
 
 MIDDLEWARE = [
@@ -113,17 +111,14 @@ REST_FRAMEWORK = {
     'EXCEPTION_HANDLER': 'apps.core.exceptions.custom_exception_handler',
 }
 
-# Git Repository settings
-GIT_REPO_ROOT = os.environ.get('GIT_REPO_ROOT', BASE_DIR / 'repo_root')
-GIT_DEFAULT_BRANCH = os.environ.get('GIT_DEFAULT_BRANCH', 'main')
+# File Storage settings (previously Git Repository)
+# Note: GIT_REPO_ROOT renamed from legacy, now serves as file storage root
+GIT_REPO_ROOT = os.environ.get('STORAGE_ROOT', os.environ.get('GIT_REPO_ROOT', BASE_DIR / 'repo_root'))
 
 # Index settings
 INDEX_PATH = Path(GIT_REPO_ROOT) / '.promptmeta' / 'index.json'
 INDEX_LOCK_PATH = Path(GIT_REPO_ROOT) / '.promptmeta' / 'index.lock'
 SCHEMA_DIR = BASE_DIR / 'schemas'
-
-# Version settings
-VERSION_TAG_PREFIX = 'prompt'
 
 # CORS settings for local development
 CORS_ALLOW_ALL_ORIGINS = True

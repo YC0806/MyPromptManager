@@ -243,18 +243,16 @@ class IndexService:
         except Exception as e:
             raise IndexLockError(f"Failed to read index: {str(e)}")
 
-    def rebuild(self, git_service) -> Dict:
+    def rebuild(self, storage_service) -> Dict:
         """
-        Rebuild index from Git repository.
+        Rebuild index from file storage.
 
         Args:
-            git_service: GitService instance
+            storage_service: FileStorageService instance
 
         Returns:
             Dict with rebuild statistics
         """
-        from apps.core.services.git_service import GitService
-
         lock = FileLock(str(self.lock_path), timeout=self.lock_timeout)
 
         try:
@@ -272,116 +270,97 @@ class IndexService:
                     'errors': [],
                 }
 
-                # Scan repository for markdown and JSON files
-                repo_root = Path(settings.GIT_REPO_ROOT)
-                prompts_dir = repo_root / 'prompts'
-                templates_dir = repo_root / 'templates'
-                chats_dir = repo_root / 'chats'
-
-                if not prompts_dir.exists() and not templates_dir.exists() and not chats_dir.exists():
-                    self._write_index(new_index)
-                    return stats
-
-                # Find all markdown files in prompts and templates directories
-                search_dirs = [d for d in [prompts_dir, templates_dir] if d.exists()]
-                md_files = []
-                for search_dir in search_dirs:
-                    md_files.extend(search_dir.rglob('*.md'))
-
-                # Find all JSON files in chats directory
-                json_files = []
-                if chats_dir.exists():
-                    json_files.extend(chats_dir.rglob('*.json'))
-
-                for md_file in md_files:
-                    try:
-                        # Read file content
-                        rel_path = md_file.relative_to(repo_root)
-                        content = git_service.read_file(str(rel_path))
-
-                        # Parse front matter
-                        metadata, body = parse_frontmatter(content)
-
-                        if not metadata.get('id'):
-                            continue
-
-                        # Get file SHA
+                # Scan storage for prompts
+                try:
+                    prompts = storage_service.list_all_items('prompt')
+                    for prompt in prompts:
                         try:
-                            sha = git_service.get_file_sha(str(rel_path))
-                        except:
-                            sha = 'unknown'
-
-                        # Extract fields
-                        fields = extract_metadata_fields(metadata)
-                        item_type = fields.get('type', 'prompt')
-
-                        entry = {
-                            'id': fields['id'],
-                            'title': fields['title'],
-                            'description': fields['description'],
-                            'slug': fields['slug'],
-                            'labels': fields['labels'],
-                            'author': fields['author'],
-                            'created_at': fields['created_at'],
-                            'updated_at': fields['updated_at'],
-                            'file_path': str(rel_path),
-                            'sha': sha,
-                        }
-
-                        if item_type == 'prompt':
+                            fields = extract_metadata_fields(prompt)
+                            entry = {
+                                'id': fields['id'],
+                                'title': fields['title'],
+                                'description': fields['description'],
+                                'slug': fields['slug'],
+                                'labels': fields['labels'],
+                                'author': fields['author'],
+                                'created_at': fields['created_at'],
+                                'updated_at': fields['updated_at'],
+                                'file_path': f"prompts/prompt_{fields['slug']}-{fields['id']}/HEAD",
+                                'sha': 'latest',
+                            }
                             new_index['prompts'].append(entry)
                             stats['prompts_added'] += 1
-                        else:
+                        except Exception as e:
+                            stats['errors'].append({
+                                'item': prompt.get('id', 'unknown'),
+                                'error': str(e),
+                            })
+                except Exception as e:
+                    stats['errors'].append({
+                        'type': 'prompts',
+                        'error': str(e),
+                    })
+
+                # Scan storage for templates
+                try:
+                    templates = storage_service.list_all_items('template')
+                    for template in templates:
+                        try:
+                            fields = extract_metadata_fields(template)
+                            entry = {
+                                'id': fields['id'],
+                                'title': fields['title'],
+                                'description': fields['description'],
+                                'slug': fields['slug'],
+                                'labels': fields['labels'],
+                                'author': fields['author'],
+                                'created_at': fields['created_at'],
+                                'updated_at': fields['updated_at'],
+                                'file_path': f"templates/template_{fields['slug']}-{fields['id']}/HEAD",
+                                'sha': 'latest',
+                            }
                             new_index['templates'].append(entry)
                             stats['templates_added'] += 1
+                        except Exception as e:
+                            stats['errors'].append({
+                                'item': template.get('id', 'unknown'),
+                                'error': str(e),
+                            })
+                except Exception as e:
+                    stats['errors'].append({
+                        'type': 'templates',
+                        'error': str(e),
+                    })
 
-                    except Exception as e:
-                        stats['errors'].append({
-                            'file': str(md_file),
-                            'error': str(e),
-                        })
-
-                # Process chat JSON files
-                for json_file in json_files:
-                    try:
-                        # Read file content
-                        rel_path = json_file.relative_to(repo_root)
-                        content = git_service.read_file(str(rel_path))
-
-                        # Parse JSON
-                        chat_data = json.loads(content)
-
-                        if not chat_data.get('id'):
-                            continue
-
-                        # Get file SHA
+                # Scan storage for chats
+                try:
+                    chats = storage_service.list_all_chats()
+                    for chat in chats:
                         try:
-                            sha = git_service.get_file_sha(str(rel_path))
-                        except:
-                            sha = 'unknown'
-
-                        # Extract fields from chat data
-                        entry = {
-                            'id': chat_data.get('id'),
-                            'title': chat_data.get('title', ''),
-                            'description': chat_data.get('description', ''),
-                            'slug': chat_data.get('id'),  # Use ID as slug for chats
-                            'labels': chat_data.get('tags', []),
-                            'author': chat_data.get('author', 'system'),
-                            'created_at': chat_data.get('created_at', datetime.utcnow().isoformat()),
-                            'updated_at': chat_data.get('updated_at', datetime.utcnow().isoformat()),
-                            'file_path': str(rel_path),
-                            'sha': sha,
-                        }
-
-                        new_index['chats'].append(entry)
-                        stats['chats_added'] += 1
-
-                    except Exception as e:
-                        stats['errors'].append({
-                            'file': str(json_file),
-                            'error': str(e),
-                        })
+                            entry = {
+                                'id': chat.get('id'),
+                                'title': chat.get('title', ''),
+                                'description': chat.get('description', ''),
+                                'slug': chat.get('id'),  # Use ID as slug for chats
+                                'labels': chat.get('tags', []),
+                                'author': chat.get('author', 'system'),
+                                'created_at': chat.get('created_at', datetime.utcnow().isoformat()),
+                                'updated_at': chat.get('updated_at', datetime.utcnow().isoformat()),
+                                'file_path': f"chats/chat_{chat.get('id')}.json",
+                                'sha': 'latest',
+                            }
+                            new_index['chats'].append(entry)
+                            stats['chats_added'] += 1
+                        except Exception as e:
+                            stats['errors'].append({
+                                'item': chat.get('id', 'unknown'),
+                                'error': str(e),
+                            })
+                except Exception as e:
+                    stats['errors'].append({
+                        'type': 'chats',
+                        'error': str(e),
+                    })
 
                 self._write_index(new_index)
                 return stats
