@@ -37,6 +37,7 @@ class FileStorageService:
             self.storage_root / 'prompts',
             self.storage_root / 'templates',
             self.storage_root / 'chats',
+            self.storage_root / 'ai-histories',
         ]
         for dir_path in dirs:
             dir_path.mkdir(parents=True, exist_ok=True)
@@ -400,3 +401,130 @@ class FileStorageService:
                 chats.append(json.load(f))
 
         return chats
+
+    # AI History operations
+
+    def create_ai_history(self, history_data: Dict) -> str:
+        """
+        Create a new AI history record.
+
+        Args:
+            history_data: AI history data including provider, conversation_id, title, messages, etc.
+
+        Returns:
+            history_id
+        """
+        history_id = history_data.get('id') or generate_ulid()
+        history_data['id'] = history_id
+
+        # Set timestamps
+        if 'created_at' not in history_data:
+            history_data['created_at'] = datetime.utcnow().isoformat()
+        if 'updated_at' not in history_data:
+            history_data['updated_at'] = datetime.utcnow().isoformat()
+
+        # Determine filename based on provider and conversation_id
+        provider = history_data.get('provider', 'unknown').lower()
+        conv_id = history_data.get('conversation_id', history_id)[:20]
+        filename = f"history_{provider}_{conv_id}-{history_id}.json"
+
+        history_path = self.storage_root / 'ai-histories' / filename
+        history_path.parent.mkdir(parents=True, exist_ok=True)
+
+        # Write JSON
+        with open(history_path, 'w', encoding='utf-8') as f:
+            json.dump(history_data, f, indent=2, ensure_ascii=False)
+
+        return history_id
+
+    def read_ai_history(self, history_id: str) -> Dict:
+        """
+        Read an AI history by ID.
+
+        Args:
+            history_id: History ID
+
+        Returns:
+            AI history data
+        """
+        histories_dir = self.storage_root / 'ai-histories'
+
+        # Find history file
+        for history_file in histories_dir.glob(f"history_*-{history_id}.json"):
+            with open(history_file, 'r', encoding='utf-8') as f:
+                return json.load(f)
+
+        raise ResourceNotFoundError(f"AI History {history_id} not found")
+
+    def update_ai_history(self, history_id: str, history_data: Dict):
+        """
+        Update an AI history.
+
+        Args:
+            history_id: History ID
+            history_data: Updated history data
+        """
+        histories_dir = self.storage_root / 'ai-histories'
+
+        # Find and update history file
+        for history_file in histories_dir.glob(f"history_*-{history_id}.json"):
+            history_data['updated_at'] = datetime.utcnow().isoformat()
+            with open(history_file, 'w', encoding='utf-8') as f:
+                json.dump(history_data, f, indent=2, ensure_ascii=False)
+            return
+
+        raise ResourceNotFoundError(f"AI History {history_id} not found")
+
+    def delete_ai_history(self, history_id: str):
+        """
+        Delete an AI history.
+
+        Args:
+            history_id: History ID
+        """
+        histories_dir = self.storage_root / 'ai-histories'
+
+        for history_file in histories_dir.glob(f"history_*-{history_id}.json"):
+            history_file.unlink()
+            return
+
+        raise ResourceNotFoundError(f"AI History {history_id} not found")
+
+    def list_all_ai_histories(self) -> List[Dict]:
+        """
+        List all AI histories.
+
+        Returns:
+            List of AI history data
+        """
+        histories_dir = self.storage_root / 'ai-histories'
+        histories = []
+
+        if not histories_dir.exists():
+            return histories
+
+        for history_file in histories_dir.glob("history_*.json"):
+            with open(history_file, 'r', encoding='utf-8') as f:
+                histories.append(json.load(f))
+
+        return histories
+
+    def find_ai_history_by_conversation(self, provider: str, conversation_id: str) -> Optional[Dict]:
+        """
+        Find an AI history by provider and conversation_id.
+
+        Args:
+            provider: AI provider name
+            conversation_id: Conversation ID from the provider
+
+        Returns:
+            AI history data if found, None otherwise
+        """
+        histories = self.list_all_ai_histories()
+
+        for history in histories:
+            if (history.get('provider', '').lower() == provider.lower() and
+                history.get('conversation_id') == conversation_id):
+                return history
+
+        return None

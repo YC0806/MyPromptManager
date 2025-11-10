@@ -1,0 +1,288 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MyPromptManager AI History Sync</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      width: 360px;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: linear-gradient(135deg, #0f766e 0%, #14b8a6 100%);
+      color: #1e293b;
+    }
+
+    .header {
+      background: white;
+      padding: 16px;
+      border-bottom: 1px solid #e2e8f0;
+    }
+
+    .header h1 {
+      font-size: 18px;
+      font-weight: 600;
+      color: #0f766e;
+      margin-bottom: 4px;
+    }
+
+    .header p {
+      font-size: 12px;
+      color: #64748b;
+    }
+
+    .content {
+      background: white;
+      padding: 16px;
+    }
+
+    .status-section {
+      margin-bottom: 20px;
+    }
+
+    .status-section h2 {
+      font-size: 14px;
+      font-weight: 600;
+      margin-bottom: 12px;
+      color: #334155;
+    }
+
+    .status-item {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 10px;
+      background: #f8fafc;
+      border-radius: 6px;
+      margin-bottom: 8px;
+    }
+
+    .status-label {
+      font-size: 13px;
+      color: #475569;
+    }
+
+    .status-value {
+      font-size: 13px;
+      font-weight: 500;
+      color: #0f766e;
+    }
+
+    .status-badge {
+      display: inline-block;
+      padding: 4px 10px;
+      border-radius: 12px;
+      font-size: 12px;
+      font-weight: 500;
+    }
+
+    .status-badge.active {
+      background: #d1fae5;
+      color: #065f46;
+    }
+
+    .status-badge.inactive {
+      background: #fee2e2;
+      color: #991b1b;
+    }
+
+    .button {
+      width: 100%;
+      padding: 10px;
+      border: none;
+      border-radius: 6px;
+      font-size: 14px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.2s;
+      margin-bottom: 8px;
+    }
+
+    .button-primary {
+      background: #0f766e;
+      color: white;
+    }
+
+    .button-primary:hover {
+      background: #115e59;
+    }
+
+    .button-secondary {
+      background: #f1f5f9;
+      color: #475569;
+    }
+
+    .button-secondary:hover {
+      background: #e2e8f0;
+    }
+
+    .input-group {
+      margin-bottom: 16px;
+    }
+
+    .input-label {
+      display: block;
+      font-size: 13px;
+      font-weight: 500;
+      color: #334155;
+      margin-bottom: 6px;
+    }
+
+    .input-field {
+      width: 100%;
+      padding: 8px 12px;
+      border: 1px solid #e2e8f0;
+      border-radius: 6px;
+      font-size: 13px;
+      transition: border-color 0.2s;
+    }
+
+    .input-field:focus {
+      outline: none;
+      border-color: #0f766e;
+    }
+
+    .switch-container {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 10px;
+      background: #f8fafc;
+      border-radius: 6px;
+      margin-bottom: 16px;
+    }
+
+    .switch-label {
+      font-size: 13px;
+      color: #475569;
+    }
+
+    .switch {
+      position: relative;
+      width: 44px;
+      height: 24px;
+    }
+
+    .switch input {
+      opacity: 0;
+      width: 0;
+      height: 0;
+    }
+
+    .slider {
+      position: absolute;
+      cursor: pointer;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background-color: #cbd5e1;
+      transition: 0.3s;
+      border-radius: 24px;
+    }
+
+    .slider:before {
+      position: absolute;
+      content: "";
+      height: 18px;
+      width: 18px;
+      left: 3px;
+      bottom: 3px;
+      background-color: white;
+      transition: 0.3s;
+      border-radius: 50%;
+    }
+
+    input:checked + .slider {
+      background-color: #0f766e;
+    }
+
+    input:checked + .slider:before {
+      transform: translateX(20px);
+    }
+
+    .divider {
+      height: 1px;
+      background: #e2e8f0;
+      margin: 16px 0;
+    }
+
+    .provider-info {
+      font-size: 12px;
+      color: #64748b;
+      margin-top: 12px;
+      padding: 10px;
+      background: #f8fafc;
+      border-radius: 6px;
+    }
+
+    .hidden {
+      display: none;
+    }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <h1>AI History Sync</h1>
+    <p>同步 AI 对话历史到 MyPromptManager</p>
+  </div>
+
+  <div class="content">
+    <!-- Status Section -->
+    <div class="status-section">
+      <h2>同步状态</h2>
+      <div class="status-item">
+        <span class="status-label">当前提供商</span>
+        <span class="status-value" id="currentProvider">未检测到</span>
+      </div>
+      <div class="status-item">
+        <span class="status-label">自动同步</span>
+        <span class="status-badge" id="autoSyncStatus">-</span>
+      </div>
+      <div class="status-item">
+        <span class="status-label">已保存对话</span>
+        <span class="status-value" id="savedCount">0</span>
+      </div>
+    </div>
+
+    <!-- Actions -->
+    <button class="button button-primary" id="extractBtn">提取当前对话</button>
+    <button class="button button-secondary" id="syncAllBtn">同步所有对话</button>
+    <button class="button button-secondary" id="settingsBtn">设置</button>
+
+    <div class="divider"></div>
+
+    <!-- Settings Section (Hidden by default) -->
+    <div id="settingsSection" class="hidden">
+      <div class="input-group">
+        <label class="input-label">API 地址</label>
+        <input type="text" class="input-field" id="apiUrl" placeholder="http://localhost:8000/api/v1">
+      </div>
+
+      <div class="switch-container">
+        <span class="switch-label">自动同步</span>
+        <label class="switch">
+          <input type="checkbox" id="autoSyncToggle">
+          <span class="slider"></span>
+        </label>
+      </div>
+
+      <button class="button button-primary" id="saveSettingsBtn">保存设置</button>
+      <button class="button button-secondary" id="cancelSettingsBtn">取消</button>
+    </div>
+
+    <!-- Provider Info -->
+    <div class="provider-info">
+      <strong>支持的 AI 提供商：</strong><br>
+      ChatGPT, DeepSeek, Claude, Gemini
+    </div>
+  </div>
+
+  <script src="popup.js"></script>
+</body>
+</html>

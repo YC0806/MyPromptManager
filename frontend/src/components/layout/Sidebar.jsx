@@ -34,6 +34,7 @@ const navSections = [
       { name: 'Prompts', icon: FileText, path: '/prompts' },
       { name: 'Templates', icon: FileCode, path: '/templates' },
       { name: 'Chats', icon: MessageSquare, path: '/chats' },
+      { name: 'AI Histories', icon: History, path: '/ai-histories' },
       { name: 'Releases', icon: Package, path: '/releases' },
       { name: 'Timeline', icon: Clock, path: '/timeline' },
       { name: 'Channels', icon: Radio, path: '/channels' },

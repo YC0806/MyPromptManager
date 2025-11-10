@@ -21,6 +21,10 @@ urlpatterns = [
     path('chats', views.ChatsListView.as_view(), name='chats-list'),
     path('chats/<str:chat_id>', views.ChatDetailView.as_view(), name='chat-detail'),
 
+    # AI Histories
+    path('ai-histories', views.AIHistoriesListView.as_view(), name='ai-histories-list'),
+    path('ai-histories/<str:history_id>', views.AIHistoryDetailView.as_view(), name='ai-history-detail'),
+
     # Search (from common API)
     path('search', views.SearchView.as_view(), name='search'),
 
