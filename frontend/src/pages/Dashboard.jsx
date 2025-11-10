@@ -1,18 +1,19 @@
-import React, { useEffect, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { FileText, Package, Clock, TrendingUp, ArrowRight } from 'lucide-react'
+import { FileText, Package, Clock, TrendingUp, ArrowRight, MessageSquare } from 'lucide-react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import Breadcrumb from '@/components/layout/Breadcrumb'
-import { commonApi } from '@/lib/api'
 import { formatDate } from '@/lib/utils'
+import api from '@/lib/api'
 
 export default function Dashboard() {
   const navigate = useNavigate()
   const [stats, setStats] = useState({
     totalPrompts: 0,
-    totalReleases: 0,
+    totalTemplates: 0,
+    totalChats: 0,
     recentActivity: [],
   })
   const [loading, setLoading] = useState(true)
@@ -24,16 +25,29 @@ export default function Dashboard() {
   const loadDashboardData = async () => {
     try {
       setLoading(true)
-      // In real implementation, fetch from API
-      // For now, using mock data
+
+      // Fetch counts for all item types
+      const [promptsRes, templatesRes, chatsRes, recentItems] = await Promise.all([
+        api.prompts.list({ limit: 1 }),
+        api.templates.list({ limit: 1 }),
+        api.chats.list({ limit: 1 }),
+        api.search.search({ limit: 10 }) // Get recent items across all types
+      ])
+
+      // Build recent activity from search results
+      const recentActivity = (recentItems.items || []).map(item => ({
+        id: item.id,
+        type: item.type || 'prompt',
+        title: item.title,
+        slug: item.slug,
+        time: new Date(item.updated_at || item.created_at),
+      }))
+
       setStats({
-        totalPrompts: 42,
-        totalReleases: 128,
-        recentActivity: [
-          { id: 1, type: 'release', title: 'API Documentation Prompt', version: 'v1.2.0', time: new Date() },
-          { id: 2, type: 'draft', title: 'Customer Support Template', time: new Date() },
-          { id: 3, type: 'release', title: 'Code Review Prompt', version: 'v2.0.0', time: new Date() },
-        ],
+        totalPrompts: promptsRes.total || 0,
+        totalTemplates: templatesRes.total || 0,
+        totalChats: chatsRes.total || 0,
+        recentActivity,
       })
     } catch (error) {
       console.error('Failed to load dashboard data:', error)
@@ -57,7 +71,7 @@ export default function Dashboard() {
 
         {/* Stats Grid */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-          <Card className="hover:shadow-md transition-shadow duration-200">
+          <Card className="hover:shadow-md transition-shadow duration-200 cursor-pointer" onClick={() => navigate('/prompts')}>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium text-zinc-600">
                 Total Prompts
@@ -65,41 +79,45 @@ export default function Dashboard() {
               <FileText className="h-5 w-5 text-teal-500" />
             </CardHeader>
             <CardContent>
-              <div className="text-3xl font-bold text-zinc-900">{stats.totalPrompts}</div>
+              <div className="text-3xl font-bold text-zinc-900">
+                {loading ? '...' : stats.totalPrompts}
+              </div>
               <p className="text-xs text-zinc-500 mt-1">
-                <TrendingUp className="inline w-3 h-3 text-green-500 mr-1" />
-                +12% from last month
+                Click to view all prompts
               </p>
             </CardContent>
           </Card>
 
-          <Card className="hover:shadow-md transition-shadow duration-200">
+          <Card className="hover:shadow-md transition-shadow duration-200 cursor-pointer" onClick={() => navigate('/templates')}>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium text-zinc-600">
-                Total Releases
+                Total Templates
               </CardTitle>
               <Package className="h-5 w-5 text-teal-500" />
             </CardHeader>
             <CardContent>
-              <div className="text-3xl font-bold text-zinc-900">{stats.totalReleases}</div>
+              <div className="text-3xl font-bold text-zinc-900">
+                {loading ? '...' : stats.totalTemplates}
+              </div>
               <p className="text-xs text-zinc-500 mt-1">
-                <TrendingUp className="inline w-3 h-3 text-green-500 mr-1" />
-                +8% from last month
+                Click to view all templates
               </p>
             </CardContent>
           </Card>
 
-          <Card className="hover:shadow-md transition-shadow duration-200">
+          <Card className="hover:shadow-md transition-shadow duration-200 cursor-pointer" onClick={() => navigate('/chats')}>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium text-zinc-600">
-                Active Drafts
+                Total Chats
               </CardTitle>
-              <Clock className="h-5 w-5 text-teal-500" />
+              <MessageSquare className="h-5 w-5 text-teal-500" />
             </CardHeader>
             <CardContent>
-              <div className="text-3xl font-bold text-zinc-900">7</div>
+              <div className="text-3xl font-bold text-zinc-900">
+                {loading ? '...' : stats.totalChats}
+              </div>
               <p className="text-xs text-zinc-500 mt-1">
-                3 ready to publish
+                Click to view all chats
               </p>
             </CardContent>
           </Card>
@@ -111,44 +129,70 @@ export default function Dashboard() {
             <div className="flex items-center justify-between">
               <div>
                 <CardTitle>Recent Activity</CardTitle>
-                <CardDescription>Latest updates to your prompts and releases</CardDescription>
+                <CardDescription>Latest updates across all items</CardDescription>
               </div>
-              <Button variant="ghost" onClick={() => navigate('/timeline')}>
-                View All <ArrowRight className="ml-2 w-4 h-4" />
-              </Button>
             </div>
           </CardHeader>
           <CardContent>
-            <div className="space-y-4">
-              {stats.recentActivity.map((activity) => (
-                <div
-                  key={activity.id}
-                  className="flex items-center justify-between p-4 rounded-lg border hover:bg-zinc-50 transition-colors duration-200 cursor-pointer"
-                  onClick={() => navigate(`/prompts/${activity.id}`)}
-                >
-                  <div className="flex items-center gap-4">
-                    <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${
-                      activity.type === 'release' ? 'bg-teal-100' : 'bg-yellow-100'
-                    }`}>
-                      {activity.type === 'release' ? (
-                        <Package className="w-5 h-5 text-teal-600" />
-                      ) : (
-                        <FileText className="w-5 h-5 text-yellow-600" />
-                      )}
+            {loading ? (
+              <div className="text-center py-8 text-zinc-500">Loading...</div>
+            ) : stats.recentActivity.length === 0 ? (
+              <div className="text-center py-8 text-zinc-500">
+                <p>No recent activity yet.</p>
+                <p className="text-sm mt-2">Create your first prompt or template to get started!</p>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {stats.recentActivity.map((activity) => {
+                  const getIcon = (type) => {
+                    switch(type) {
+                      case 'template': return <Package className="w-5 h-5 text-purple-600" />
+                      case 'chat': return <MessageSquare className="w-5 h-5 text-blue-600" />
+                      default: return <FileText className="w-5 h-5 text-teal-600" />
+                    }
+                  }
+
+                  const getIconBg = (type) => {
+                    switch(type) {
+                      case 'template': return 'bg-purple-100'
+                      case 'chat': return 'bg-blue-100'
+                      default: return 'bg-teal-100'
+                    }
+                  }
+
+                  const getRoute = (type, id) => {
+                    switch(type) {
+                      case 'template': return `/templates/${id}`
+                      case 'chat': return `/chats/${id}`
+                      default: return `/prompts/${id}`
+                    }
+                  }
+
+                  return (
+                    <div
+                      key={activity.id}
+                      className="flex items-center justify-between p-4 rounded-lg border hover:bg-zinc-50 transition-colors duration-200 cursor-pointer"
+                      onClick={() => navigate(getRoute(activity.type, activity.id))}
+                    >
+                      <div className="flex items-center gap-4">
+                        <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${getIconBg(activity.type)}`}>
+                          {getIcon(activity.type)}
+                        </div>
+                        <div>
+                          <p className="font-semibold text-zinc-900">{activity.title}</p>
+                          <p className="text-sm text-zinc-500">
+                            Updated {formatDate(activity.time)}
+                          </p>
+                        </div>
+                      </div>
+                      <Badge variant="outline" className="capitalize">
+                        {activity.type}
+                      </Badge>
                     </div>
-                    <div>
-                      <p className="font-semibold text-zinc-900">{activity.title}</p>
-                      <p className="text-sm text-zinc-500">
-                        {activity.type === 'release' ? `Released ${activity.version}` : 'Draft saved'} • {formatDate(activity.time)}
-                      </p>
-                    </div>
-                  </div>
-                  {activity.type === 'release' && (
-                    <Badge variant="success">{activity.version}</Badge>
-                  )}
-                </div>
-              ))}
-            </div>
+                  )
+                })}
+              </div>
+            )}
           </CardContent>
         </Card>
 

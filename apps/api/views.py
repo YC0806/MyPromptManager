@@ -9,8 +9,8 @@ from datetime import datetime
 
 from apps.core.services.file_storage_service import FileStorageService
 from apps.core.services.index_service import IndexService
-from apps.core.utils.frontmatter import parse_frontmatter
-from apps.core.exceptions import ResourceNotFoundError, ValidationError
+from apps.core.utils.frontmatter import parse_frontmatter, serialize_frontmatter
+from apps.core.exceptions import ResourceNotFoundError, ValidationError, BadRequestError
 
 
 # ============================================================================
@@ -49,7 +49,7 @@ class PromptsListView(APIView):
         """Create a new prompt."""
         content = request.data.get('content')
         if not content:
-            raise ValidationError("content is required")
+            raise BadRequestError("content is required")
 
         # Parse frontmatter
         metadata, body = parse_frontmatter(content)
@@ -74,6 +74,7 @@ class PromptsListView(APIView):
         # Add to index
         index_service = IndexService()
         slug = metadata['slug']
+        metadata['id'] = item_id  # Add ID to metadata for indexing
         index_service.add_or_update(
             item_id,
             metadata,
@@ -114,14 +115,14 @@ class PromptDetailView(APIView):
             'id': prompt_id,
             'metadata': metadata,
             'content': content,
-            'full_content': f"---\n{parse_frontmatter.serialize_frontmatter(metadata)}\n---\n\n{content}",
+            'full_content': serialize_frontmatter(metadata, content),
         })
 
     def put(self, request, prompt_id):
         """Update prompt (creates new version)."""
         content = request.data.get('content')
         if not content:
-            raise ValidationError("content is required")
+            raise BadRequestError("content is required")
 
         storage = FileStorageService()
         index_service = IndexService()
@@ -267,7 +268,7 @@ class TemplatesListView(APIView):
         """Create a new template."""
         content = request.data.get('content')
         if not content:
-            raise ValidationError("content is required")
+            raise BadRequestError("content is required")
 
         # Parse frontmatter
         metadata, body = parse_frontmatter(content)
@@ -292,6 +293,7 @@ class TemplatesListView(APIView):
         # Add to index
         index_service = IndexService()
         slug = metadata['slug']
+        metadata['id'] = item_id  # Add ID to metadata for indexing
         index_service.add_or_update(
             item_id,
             metadata,
@@ -338,7 +340,7 @@ class TemplateDetailView(APIView):
         """Update template (creates new version)."""
         content = request.data.get('content')
         if not content:
-            raise ValidationError("content is required")
+            raise BadRequestError("content is required")
 
         storage = FileStorageService()
         index_service = IndexService()

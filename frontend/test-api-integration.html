@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>API Integration Test</title>
+  <style>
+    body {
+      font-family: system-ui, -apple-system, sans-serif;
+      max-width: 800px;
+      margin: 50px auto;
+      padding: 20px;
+      background: #f5f5f5;
+    }
+    .test-section {
+      background: white;
+      padding: 20px;
+      margin: 20px 0;
+      border-radius: 8px;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    .test-result {
+      margin: 10px 0;
+      padding: 10px;
+      border-radius: 4px;
+      font-family: monospace;
+      font-size: 14px;
+    }
+    .success {
+      background: #d4edda;
+      color: #155724;
+      border: 1px solid #c3e6cb;
+    }
+    .error {
+      background: #f8d7da;
+      color: #721c24;
+      border: 1px solid #f5c6cb;
+    }
+    button {
+      background: #14b8a6;
+      color: white;
+      border: none;
+      padding: 10px 20px;
+      border-radius: 4px;
+      cursor: pointer;
+      margin: 5px;
+    }
+    button:hover {
+      background: #0d9488;
+    }
+    pre {
+      background: #f8f9fa;
+      padding: 10px;
+      border-radius: 4px;
+      overflow-x: auto;
+    }
+  </style>
+</head>
+<body>
+  <h1>API Integration Test</h1>
+  <p>Testing frontend-backend integration for MyPromptManager</p>
+
+  <div class="test-section">
+    <h2>1. Health Check</h2>
+    <button onclick="testHealth()">Test Health API</button>
+    <div id="health-result"></div>
+  </div>
+
+  <div class="test-section">
+    <h2>2. List Prompts</h2>
+    <button onclick="testListPrompts()">Test List Prompts</button>
+    <div id="prompts-result"></div>
+  </div>
+
+  <div class="test-section">
+    <h2>3. Search API (items field)</h2>
+    <button onclick="testSearch()">Test Search</button>
+    <div id="search-result"></div>
+  </div>
+
+  <div class="test-section">
+    <h2>4. Create Prompt</h2>
+    <button onclick="testCreatePrompt()">Test Create Prompt</button>
+    <div id="create-result"></div>
+  </div>
+
+  <div class="test-section">
+    <h2>5. Error Handling (400 vs 422)</h2>
+    <button onclick="testErrorHandling()">Test Error Codes</button>
+    <div id="error-result"></div>
+  </div>
+
+  <script>
+    const API_BASE = 'http://localhost:8000/v1';
+
+    async function apiFetch(url, options = {}) {
+      const response = await fetch(url, {
+        ...options,
+        headers: {
+          'Content-Type': 'application/json',
+          ...options.headers,
+        },
+      });
+
+      const data = await response.json().catch(() => null);
+      return { status: response.status, data };
+    }
+
+    function showResult(elementId, success, message, data = null) {
+      const el = document.getElementById(elementId);
+      el.innerHTML = `
+        <div class="test-result ${success ? 'success' : 'error'}">
+          <strong>${success ? '✓' : '✗'} ${message}</strong>
+          ${data ? `<pre>${JSON.stringify(data, null, 2)}</pre>` : ''}
+        </div>
+      `;
+    }
+
+    async function testHealth() {
+      try {
+        const { status, data } = await apiFetch(`${API_BASE}/health`);
+        showResult('health-result', status === 200, `Health check: ${data.status}`, data);
+      } catch (error) {
+        showResult('health-result', false, `Error: ${error.message}`);
+      }
+    }
+
+    async function testListPrompts() {
+      try {
+        const { status, data } = await apiFetch(`${API_BASE}/prompts?limit=5`);
+        showResult('prompts-result',
+          status === 200 && data.prompts !== undefined,
+          `Listed ${data.count} prompts`,
+          { count: data.count, total: data.total }
+        );
+      } catch (error) {
+        showResult('prompts-result', false, `Error: ${error.message}`);
+      }
+    }
+
+    async function testSearch() {
+      try {
+        const { status, data } = await apiFetch(`${API_BASE}/search?type=prompt&limit=5`);
+        const hasItems = data.items !== undefined;
+        const noResults = data.results !== undefined;
+
+        showResult('search-result',
+          status === 200 && hasItems,
+          hasItems
+            ? `✓ Search returns 'items' field (${data.count} items)`
+            : noResults
+              ? `✗ Still using 'results' field - needs update!`
+              : 'Unexpected response format',
+          data
+        );
+      } catch (error) {
+        showResult('search-result', false, `Error: ${error.message}`);
+      }
+    }
+
+    async function testCreatePrompt() {
+      try {
+        const content = `---
+title: Frontend Test Prompt
+description: Testing frontend integration
+slug: frontend-test-${Date.now()}
+labels:
+  - test
+author: frontend-tester
+---
+
+# Test Prompt
+
+This is a test from the frontend.
+`;
+
+        const { status, data } = await apiFetch(`${API_BASE}/prompts`, {
+          method: 'POST',
+          body: JSON.stringify({ content })
+        });
+
+        showResult('create-result',
+          status === 201 && data.id && data.version_id,
+          `Created prompt with ID: ${data.id}`,
+          data
+        );
+      } catch (error) {
+        showResult('create-result', false, `Error: ${error.message}`);
+      }
+    }
+
+    async function testErrorHandling() {
+      try {
+        // Test 1: Empty content should return 400
+        const { status: status1, data: data1 } = await apiFetch(`${API_BASE}/prompts`, {
+          method: 'POST',
+          body: JSON.stringify({ content: '' })
+        });
+
+        const test1Pass = status1 === 400;
+
+        // Test 2: Missing title in frontmatter should return 422
+        const invalidContent = `---
+description: Missing title
+---
+
+Body
+`;
+        const { status: status2, data: data2 } = await apiFetch(`${API_BASE}/prompts`, {
+          method: 'POST',
+          body: JSON.stringify({ content: invalidContent })
+        });
+
+        const test2Pass = status2 === 422;
+
+        showResult('error-result',
+          test1Pass && test2Pass,
+          `Empty content: ${status1} (${test1Pass ? '✓' : '✗ should be 400'}), Missing title: ${status2} (${test2Pass ? '✓' : '✗ should be 422'})`,
+          {
+            emptyContent: { status: status1, ...data1 },
+            missingTitle: { status: status2, ...data2 }
+          }
+        );
+      } catch (error) {
+        showResult('error-result', false, `Error: ${error.message}`);
+      }
+    }
+  </script>
+</body>
+</html>

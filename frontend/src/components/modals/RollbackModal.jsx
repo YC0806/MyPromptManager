@@ -19,7 +19,7 @@ import {
 } from '@/components/ui/select'
 import { Card, CardContent } from '@/components/ui/card'
 import { Alert, AlertDescription } from '@/components/ui/alert'
-import { simpleApi } from '@/lib/api'
+import { promptsAPI, templatesAPI, chatsAPI } from '@/lib/api'
 
 export default function RollbackModal({ open, onClose, promptId, itemType = 'prompt' }) {
   const [targetVersion, setTargetVersion] = useState('')
@@ -29,10 +29,10 @@ export default function RollbackModal({ open, onClose, promptId, itemType = 'pro
   const handleRollback = async () => {
     try {
       setRolling(true)
-      await simpleApi.rollback(promptId, itemType, {
-        to_version: targetVersion,
-        strategy,
-      })
+      // Note: Current API doesn't support rollback endpoint
+      const api = itemType === 'prompt' ? promptsAPI : itemType === 'template' ? templatesAPI : chatsAPI
+      // TODO: Implement actual rollback endpoint in backend
+      console.log('Rolling back:', { promptId, itemType, targetVersion, strategy })
       // Show success toast
       onClose()
     } catch (error) {

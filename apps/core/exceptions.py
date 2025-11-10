@@ -23,6 +23,12 @@ class ConflictError(BasePromptException):
     default_detail = 'Resource conflict detected.'
 
 
+class BadRequestError(BasePromptException):
+    """Bad request error (400)."""
+    status_code = status.HTTP_400_BAD_REQUEST
+    default_detail = 'Bad request.'
+
+
 class ValidationError(BasePromptException):
     """Semantic validation error (422)."""
     status_code = status.HTTP_422_UNPROCESSABLE_ENTITY

@@ -27,12 +27,12 @@ import {
 } from '@/components/ui/select'
 import Breadcrumb from '@/components/layout/Breadcrumb'
 import useStore from '@/store/useStore'
-import { commonApi } from '@/lib/api'
+import { searchAPI } from '@/lib/api'
 import { formatDate, getLabelColor, getStatusColor } from '@/lib/utils'
 
 export default function PromptsList() {
   const navigate = useNavigate()
-  const { viewMode, setViewMode, mode } = useStore()
+  const { viewMode, setViewMode } = useStore()
   const [prompts, setPrompts] = useState([])
   const [loading, setLoading] = useState(true)
   const [filters, setFilters] = useState({
@@ -47,12 +47,12 @@ export default function PromptsList() {
   const loadPrompts = async () => {
     try {
       setLoading(true)
-      const response = await commonApi.search({
+      const response = await searchAPI.search({
         type: 'prompt', // Only fetch prompts
         labels: filters.label || undefined,
         author: filters.author || undefined,
       })
-      setPrompts(response.data.results || [])
+      setPrompts(response.items || [])
     } catch (error) {
       console.error('Failed to load prompts:', error)
     } finally {
@@ -121,11 +121,6 @@ export default function PromptsList() {
                 <LayoutGrid className="w-4 h-4" />
               </Button>
             </div>
-
-            {/* Bulk Actions (Advanced Mode Only) */}
-            {mode === 'advanced' && (
-              <Button variant="outline">Bulk Actions</Button>
-            )}
           </div>
         </div>
 

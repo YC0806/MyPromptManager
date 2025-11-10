@@ -42,7 +42,6 @@ const navSections = [
   {
     title: 'Advanced',
     icon: GitBranch,
-    advanced: true,
     items: [
       { name: 'Revisions', icon: History, path: '/revisions' },
       { name: 'Repo', icon: GitBranch, path: '/repo' },
@@ -60,7 +59,7 @@ const navSections = [
 
 export default function Sidebar() {
   const location = useLocation()
-  const { mode, sidebarCollapsed } = useStore()
+  const { sidebarCollapsed } = useStore()
 
   const isActive = (path) => {
     if (path === '/') return location.pathname === '/'
@@ -87,9 +86,6 @@ export default function Sidebar() {
       {/* Navigation */}
       <nav className="p-4">
         {navSections.map((section) => {
-          // Hide Advanced section if in Simple mode
-          if (section.advanced && mode === 'simple') return null
-
           return (
             <div key={section.title} className="mb-6">
               <div className="flex items-center gap-2 mb-2 px-2">
@@ -127,7 +123,7 @@ export default function Sidebar() {
       {/* Footer */}
       <div className="absolute bottom-0 left-0 right-0 p-4 border-t bg-white">
         <div className="text-xs text-zinc-500 text-center">
-          <p>Mode: <span className="font-semibold text-teal-600">{mode === 'simple' ? 'Simple' : 'Advanced'}</span></p>
+          <p className="font-semibold text-teal-600">MyPromptManager</p>
         </div>
       </div>
     </aside>

@@ -1,17 +1,8 @@
 import React, { useState } from 'react'
-import { Search, Bell, HelpCircle, Menu, GitBranch, Settings } from 'lucide-react'
+import { Search, Bell, HelpCircle, Menu, Settings } from 'lucide-react'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { Switch } from '@/components/ui/switch'
-import { Label } from '@/components/ui/label'
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -24,10 +15,6 @@ import useStore from '@/store/useStore'
 
 export default function Topbar() {
   const {
-    mode,
-    setMode,
-    currentBranch,
-    setCurrentBranch,
     currentChannel,
     setCurrentChannel,
     toggleSidebar,
@@ -35,10 +22,6 @@ export default function Topbar() {
   } = useStore()
 
   const [searchQuery, setSearchQuery] = useState('')
-
-  const handleModeToggle = () => {
-    setMode(mode === 'simple' ? 'advanced' : 'simple')
-  }
 
   return (
     <header className={cn(
@@ -57,18 +40,6 @@ export default function Topbar() {
           >
             <Menu className="w-5 h-5" />
           </Button>
-
-          {/* Mode Toggle */}
-          <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg border border-zinc-200 bg-white">
-            <Label htmlFor="mode-toggle" className="text-sm cursor-pointer">
-              {mode === 'simple' ? 'Simple' : 'Advanced'}
-            </Label>
-            <Switch
-              id="mode-toggle"
-              checked={mode === 'advanced'}
-              onCheckedChange={handleModeToggle}
-            />
-          </div>
         </div>
 
         {/* Middle Section - Search */}
@@ -90,21 +61,6 @@ export default function Topbar() {
 
         {/* Right Section */}
         <div className="flex items-center gap-3">
-          {/* Branch Selector (Advanced Mode Only) */}
-          {mode === 'advanced' && (
-            <Select value={currentBranch} onValueChange={setCurrentBranch}>
-              <SelectTrigger className="w-[140px]">
-                <GitBranch className="w-4 h-4 mr-2" />
-                <SelectValue placeholder="Branch" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="main">main</SelectItem>
-                <SelectItem value="develop">develop</SelectItem>
-                <SelectItem value="feature-x">feature-x</SelectItem>
-              </SelectContent>
-            </Select>
-          )}
-
           {/* Channel Toggle */}
           <div className="flex gap-2">
             <Badge

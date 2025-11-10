@@ -72,8 +72,10 @@ class FileStorageService:
     def _write_yaml(self, file_path: Path, data: Dict):
         """Write YAML file."""
         file_path.parent.mkdir(parents=True, exist_ok=True)
+        # Convert data to plain dict/list to avoid Python object tags
+        plain_data = json.loads(json.dumps(data))
         with open(file_path, 'w', encoding='utf-8') as f:
-            yaml.dump(data, f, allow_unicode=True, default_flow_style=False)
+            yaml.safe_dump(plain_data, f, allow_unicode=True, default_flow_style=False)
 
     def _get_head_target(self, item_type: str, item_id: str, slug: str) -> Optional[str]:
         """Get the target of HEAD pointer."""
@@ -106,6 +108,9 @@ class FileStorageService:
         """
         item_id = metadata.get('id') or generate_ulid()
         slug = metadata.get('slug', item_id)
+
+        # Ensure ID is in metadata
+        metadata['id'] = item_id
 
         # Create directory structure
         item_dir = self._get_item_directory(item_type, item_id, slug)

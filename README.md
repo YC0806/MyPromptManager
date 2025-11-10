@@ -1,301 +1,198 @@
 # MyPromptManager
 
-基于 Markdown + YAML Front Matter + JSON 索引 + Git 版本控制的提示词管理工具。
+基于 Markdown + YAML Front Matter 的提示词/模版/对话管理工具，使用本地文件系统进行版本控制，并通过统一的 REST API 暴露所有能力。
 
-> 🎯 **本地版本**：专为本地使用设计，无需登录和身份验证，开箱即用！
+> 🎯 **当前版本亮点**：本地优先、无需认证、文件系统版本管理、统一 `/v1` API、React 控制台。
 
 ## 核心特性
 
-- **双车道设计**：Simple API（低门槛）和 Detail API（技术版）
-- **Git 原生版本控制**：使用 Git 标签进行语义化版本管理
-- **索引缓存**：快速搜索和查询，支持并发控制
-- **草稿系统**：使用隐藏 UI 分支进行草稿保存
-- **发布管理**：支持多渠道发布（prod/beta）和回滚
-- **无需身份验证**：本地使用，直接访问所有功能
+- **文件系统版本控制**：`apps/core/services/file_storage_service.py` 负责在 `repo_root/` 下管理版本目录、HEAD 指针和不可变版本文件。
+- **统一 API**：`apps/api/` 合并了 Simple/Detail/Common 端点，提供 prompts/templates/chats CRUD、版本历史、搜索、索引与健康检查。
+- **本地使用无需登录**：`REST_FRAMEWORK` 配置为 AllowAny，开发环境开箱即用。
+- **现代化前端**：React 18 + Vite + Tailwind + shadcn/ui，内置 Simple / Advanced 模式、Dashboard、Prompts/Templates/Chats 列表、版本历史、索引状态等页面。
+- **快速索引与搜索**：`IndexService` 管理 `.promptmeta/index.json`，支持标签/作者/slug 过滤和文件锁并发控制。
+- **自动化脚本**：`start-frontend.sh`、`scripts/api_request_simulator.py` 等工具帮助自检与演示。
 
 ## 快速开始
 
-### 后端设置
+### 运行环境
+- Python 3.10+
+- Node.js 18+ / npm 9+
+- 可选：`pipx` 或虚拟环境
 
-#### 1. 安装依赖
-
+### 后端（Django + DRF）
 ```bash
 pip install -r requirements.txt
-```
-
-#### 2. 初始化数据库
-
-```bash
 python manage.py migrate
+python manage.py runserver  # 默认监听 http://127.0.0.1:8000
 ```
 
-#### 3. 运行开发服务器
-
+### 前端（React + Vite）
 ```bash
-python manage.py runserver
-```
-
-后端服务将在 http://127.0.0.1:8000 启动。
-
-### 前端设置
-
-#### 1. 进入前端目录并安装依赖
-
-```bash
+./start-frontend.sh        # 自动安装依赖、探活后端并运行 vite dev server
+# 或手动
 cd frontend
 npm install
+npm run dev                # 前端默认 http://localhost:3000
 ```
 
-#### 2. 运行开发服务器
+前后端启动后，浏览器访问 http://localhost:3000 即可体验完整应用（无需登录）。
 
+### 常用脚本
 ```bash
-npm run dev
+python scripts/api_request_simulator.py --base-url http://127.0.0.1:8000 \
+  --operations create update --types prompts templates
 ```
+^ 读取 `scripts/api_test_data.json`，批量验证统一 API 的创建/更新/删除流程。
 
-前端应用将在 http://localhost:3000 启动。
-
-### Git 数据目录与索引
-
-项目使用独立的 Git 仓库存放所有 Markdown 内容。默认路径是 `repo_root/`（可通过 `GIT_REPO_ROOT` 环境变量覆盖），其布局如下：
-
-- `.git/`：dulwich 初始化的 Git 数据目录
-- `.promptmeta/index.json`：索引缓存，由 `IndexService` + filelock 维护
-- `prompts/`：提示词 Markdown
-- `templates/`：模版 Markdown
-
-可通过以下方式管理索引：
-
-- `GET /v1/index/status`：查看索引文件元数据与统计
-- `POST /v1/index/rebuild`：扫描 Git 仓库并重建索引
-- `POST /v1/index/repair`：针对损坏索引的快速修复
-
-### 管理提示词 / 模版数据
-
-1. **直接编辑仓库**：在 `repo_root/prompts/*.md` 或 `repo_root/templates/*.md` 中维护带 Front Matter 的 Markdown，并推送到 Git。
-2. **通过 API 操作**：Simple API 负责草稿保存与发布，Detail API 提供原始读写、Diff、Tag 等全量能力。
-3. **刷新索引**：新增/重命名文件后，调用 `POST /v1/index/rebuild` 或 `POST /v1/index/repair` 以让搜索结果同步。
-4. **版本追踪**：`VersionService` 使用 `prompt/<id>/vX.Y.Z` 形式的 Git 标签来记录发布元数据（channel、notes 等）。
-
-> 💡 仓库仍保留 `generate_test_data.py`，运行前请先阅读脚本并确认其输出路径与当前 `repo_root` 结构一致。
-
-### API 自检
-
-`test_api_endpoints.py` 使用 Django `RequestFactory` 对 Simple/Detail/Common API 做冒烟测试，确保 prompt/template 路由均可解析：
-
-```bash
-python test_api_endpoints.py
-```
-
-如需手动探活，可执行：
-
-```bash
-curl http://127.0.0.1:8000/v1/health
-curl "http://127.0.0.1:8000/v1/search?type=prompt"
-```
-
-更多排查记录参见 [doc/BACKEND_FIXES.md](doc/BACKEND_FIXES.md)。
-
-### 完整开发环境
-
-**方式 1：使用启动脚本（推荐）**
-
-```bash
-# 终端 1 - 后端
-python manage.py runserver
-
-# 终端 2 - 前端
-./start-frontend.sh
-```
-
-**方式 2：手动启动**
-
-```bash
-# 终端 1 - 后端
-python manage.py runserver
-
-# 终端 2 - 前端
-cd frontend && npm run dev
-```
-
-访问 http://localhost:3000 即可使用完整应用，**无需登录**！
-
-> 📖 详细安装与排错步骤请查看 [doc/LOCAL_SETUP.md](doc/LOCAL_SETUP.md)
-
-## API 端点
-
-### Simple API（简化版 - `/v1/simple/`）
-
-面向非技术用户，所有端点同时支持 `prompts/{id}` 与 `templates/{id}` 路径：
-
-- `GET .../timeline`：查看发布时间线（支持 release / draft 视图）
-- `GET .../content`：按版本或最新发布读取内容与 Front Matter
-- `POST .../save`：保存草稿（UI 分支）
-- `POST .../publish`：发布版本并创建标签
-- `GET .../compare`：比较两个版本的内容与元数据
-- `POST .../rollback`：基于指定版本回滚并重新发布
-
-### Detail API（技术版 - `/v1/detail/`）
-
-为技术用户提供完整 Git 能力，同样兼容 prompt/template：
-
-- `GET .../history`：查看文件提交历史
-- `GET .../diff`：比较任意两个引用（SHA/分支/标签）
-- `GET .../raw` / `PUT .../raw`：读取或写入原始 Markdown（带 ETag 校验）
-- `GET .../releases` / `POST .../releases`：列出或创建版本标签
-- `GET /v1/detail/git/branches`：列出分支
-- `POST /v1/detail/git/checkout`：切换/创建分支
-- `POST /v1/detail/git/tag`：创建轻量或注释标签
-
-### Common API（共享端点 - `/v1/`）
-
-两个车道都可以使用：
-
-- `GET /v1/search` - 搜索提示词/模板
-- `GET /v1/index/status` - 索引状态
-- `POST /v1/index/repair` - 修复索引
-- `POST /v1/index/rebuild` - 重建索引
-- `GET /v1/schemas/frontmatter` - Front Matter Schema
-- `GET /v1/schemas/index` - Index Schema
-- `POST /v1/validate/frontmatter` - 验证 Front Matter
-- `GET /v1/health` - 健康检查
-
-> 更详细的请求/响应示例见 [doc/API_ENDPOINTS.md](doc/API_ENDPOINTS.md)。
-
-## 架构说明
-
-### 目录结构
-
+## 项目结构概览
 ```
 MyPromptManager/
 ├── apps/
-│   ├── api_common/        # 共享 API（搜索、索引、Schema）
-│   ├── api_detail/        # 技术版 API
-│   ├── api_simple/        # 简化版 API
-│   └── core/              # Git / Index / Version 服务
-├── config/                # Django 配置
-├── doc/                   # 深入文档与迁移笔记
-├── frontend/              # React + Vite 前端
-│   ├── src/
-│   └── package.json
-├── repo_root/             # 默认 Git 仓库（可通过 GIT_REPO_ROOT 覆盖）
-│   ├── .git/
-│   ├── .promptmeta/
-│   │   └── index.json
+│   ├── api/                      # 统一 REST API（prompts/templates/chats/index/search/health）
+│   └── core/
+│       ├── services/
+│       │   ├── file_storage_service.py
+│       │   └── index_service.py
+│       └── utils/frontmatter.py
+├── config/                       # Django 配置（settings/urls）
+├── frontend/                     # React 应用（Sidebar、Topbar、Dashboard、列表、详情、索引等页面）
+├── repo_root/                    # 本地数据目录（首次运行会自动创建）
 │   ├── prompts/
-│   └── templates/
-├── schemas/               # JSON Schema 定义
-├── start-frontend.sh      # 前端启动脚本
-├── test_api_endpoints.py  # API 冒烟测试
-├── generate_test_data.py  # （可选）示例数据脚本
-├── manage.py              # Django 管理脚本
-├── requirements.txt       # Python 依赖
+│   ├── templates/
+│   └── chats/
+├── schemas/                      # JSON Schema（可供 IDE 校验 Front Matter）
+├── scripts/api_request_simulator.py
+├── manage.py
 └── README.md
 ```
+> 旧的 `apps/api_simple|api_detail|api_common` 仍保留在仓库中，供迁移参考，但 `config/urls.py` 只加载新的 `apps.api` 路由。
 
-### 技术栈
+## 文件存储与版本模型
 
-#### 后端
-- **框架**: Django 4.2 + Django REST Framework
-- **Git 库**: dulwich (纯 Python Git 实现)
-- **并发控制**: filelock + ETag
-- **数据格式**: YAML (ruamel.yaml) + JSON
-
-#### 前端
-- **框架**: React 18 + Vite
-- **样式**: Tailwind CSS
-- **路由**: React Router
-- **HTTP 客户端**: Axios
-- **图标**: Lucide React
-
-### 数据模型
-
-#### Markdown 文件格式
+### Markdown + Front Matter
+所有 prompts/templates 仍以 Markdown + YAML/JSON Front Matter 存储，最小示例如下：
 
 ```markdown
 ---
 id: 01HQXYZ123ABC456DEF789
-title: My Awesome Prompt
-description: A helpful prompt for...
+title: Personalized Support Reply
+description: Auto-generate support replies based on context
 type: prompt
-slug: my-awesome-prompt
-labels:
-  - ai
-  - coding
-author: john.doe
-created_at: 2024-01-01T00:00:00Z
-updated_at: 2024-01-01T00:00:00Z
+slug: support-reply
+labels: [support, email]
+author: jane.doe
+created_at: 2024-11-05T08:00:00Z
+updated_at: 2024-11-05T08:00:00Z
 ---
 
-# Prompt Content
-
-Your prompt content goes here...
+# Reply Template
+...
 ```
 
-可根据需要在 Front Matter 中扩展自定义字段（如 project、locale 等），索引服务会保留未知字段。
+### 目录布局
+```
+repo_root/
+├── prompts/
+│   └── prompt_{slug}-{ULID}/
+│       ├── prompt.yaml         # 最新元数据（供索引与前端展示）
+│       ├── HEAD                # 指向当前版本（例如 versions/pv_slug-id_2025-01-01T08-00Z_A1B2C.md）
+│       └── versions/
+│           └── pv_{slug}-{ULID}_{timestamp}_{suffix}.md
+├── templates/
+│   └── template_{slug}-{ULID}/
+│       ├── template.yaml
+│       ├── HEAD
+│       └── versions/tv_{slug}-{ULID}_{timestamp}_{suffix}.md
+└── chats/
+    └── chat_{title-slug}-{ULID}.json
+```
+- `FileStorageService` 负责确保目录存在、写入 Front Matter + 内容、维护 HEAD 指针、生成 `YYYY-MM-DDTHH-MMZ_suffix` 形式的 `version_id`。
+- Chats 为 JSON 文件，不做多版本管理，直接覆盖。
 
-#### Git 标签命名
+### 索引文件
+- 索引路径：`repo_root/.promptmeta/index.json`，锁文件：`index.lock`。
+- `IndexService` 通过 `filelock` 序列化写入，保存 prompts/templates/chats 的摘要信息（标题、标签、作者、文件路径等）。
+- `/v1/index/rebuild` 会扫描 `repo_root` 重新生成索引，适合手动修改文件或修复损坏索引时使用。
 
-- 格式：`prompt/<ULID>/vX.Y.Z`
-- 示例：`prompt/01HQXYZ123ABC456DEF789/v1.0.0`
-- 标签消息包含 JSON 元数据
+## API 总览（`/v1` 前缀）
+所有端点均定义在 `apps/api/views.py`，默认允许匿名访问，错误响应遵循 RFC7807。
 
-#### 分支策略
+| 资源 | 列表 / 创建 | 详情 (GET/PUT/DELETE) | 版本列表 | 版本详情 |
+|------|-------------|-----------------------|----------|----------|
+| Prompts | `GET/POST /v1/prompts` | `/v1/prompts/{id}` | `/v1/prompts/{id}/versions` | `/v1/prompts/{id}/versions/{version_id}` |
+| Templates | `GET/POST /v1/templates` | `/v1/templates/{id}` | `/v1/templates/{id}/versions` | `/v1/templates/{id}/versions/{version_id}` |
+| Chats | `GET/POST /v1/chats` | `/v1/chats/{id}` | – | – |
+| 搜索 | `GET /v1/search?type=prompt&labels=...` | | | |
+| 索引 | `GET /v1/index/status` / `POST /v1/index/rebuild` | | | |
+| 健康检查 | `GET /v1/health` | | | |
 
-- `main` - 主分支（默认工作分支）
-- `ui/<user>/<prompt_id>/<session>` - UI 草稿分支（隐藏）
-- `feature/*` - 功能分支（Detail 用户可用）
+### 典型请求
+```bash
+# 创建 Prompt（content 内含 Front Matter）
+cat <<'EOF' | curl -X POST http://127.0.0.1:8000/v1/prompts \
+  -H 'Content-Type: application/json' -d @-
+{
+  "content": "---\n{\n  \"title\": \"Release Checklist\",\n  \"type\": \"prompt\",\n  \"labels\": [\"release\"],\n  \"author\": \"local\"\n}\n---\n\n# Steps\n- [ ] Review code\n- [ ] Run tests\n"
+}
+EOF
+
+# 列出版本
+prompt_id="01HQXYZ123ABC456DEF789"
+curl http://127.0.0.1:8000/v1/prompts/$prompt_id/versions
+
+# 获取指定版本
+curl http://127.0.0.1:8000/v1/prompts/$prompt_id/versions/2025-01-02T10-00Z_AB12C
+
+# 搜索模板
+curl "http://127.0.0.1:8000/v1/search?type=template&limit=5"
+
+# 查看索引状态
+curl http://127.0.0.1:8000/v1/index/status
+```
+
+## React 控制台
+- **Sidebar**：分组导航（Dashboard / Prompts / Templates / Chats / Releases / Timeline / Repo / Index）。
+- **Topbar**：项目选择、Simple ↔ Advanced 切换、全局搜索、帮助/设置按钮。
+- **页面**：Dashboard、Prompts/Templates 列表 + 详情、Chats、Timeline、Releases、Repo Advanced、Index Status。
+- **交互**：表格/卡片视图切换、标签过滤、版本时间线、复制按钮、响应式布局。
+- **状态管理**：`frontend/src/store/useStore.js` 负责模式、筛选、Sidebar 折叠等 UI 状态。
+
+## 索引维护与调试
+- `GET /v1/index/status`：返回 prompts/templates/chats 计数、最后更新时间、索引文件大小。
+- `POST /v1/index/rebuild`：全量重建（当手动移动文件或索引损坏时触发）。
+- `scripts/api_request_simulator.py`：配合 `scripts/api_test_data.json` 进行端到端验证。
+- 审计：`apps/core/models.py` 中的 `AuditLog` 记录 API 行为，可协助排查。
+
+## 测试与质量
+- `python manage.py test`：运行 Django/DRF 测试（可按需新增用例）。
+- `npm run build` / `npm run lint`：前端构建与静态检查。
+- `python scripts/api_request_simulator.py ...`：模拟真实请求流，确保统一 API 与索引刷新正常。
 
 ## 环境变量
-
-在生产环境中，建议配置以下环境变量：
-
 ```bash
-# Django 配置
 DJANGO_SECRET_KEY=your-secret-key
-DJANGO_DEBUG=False
-DJANGO_ALLOWED_HOSTS=your-domain.com
-
-# Git 仓库配置
-GIT_REPO_ROOT=/path/to/repo
-GIT_DEFAULT_BRANCH=main
+DJANGO_DEBUG=True
+DJANGO_ALLOWED_HOSTS=localhost,127.0.0.1
+STORAGE_ROOT=/absolute/path/to/repo_root   # 可选；默认使用项目根下的 repo_root/
+# 兼容旧配置：若未设置 STORAGE_ROOT，会退回 GIT_REPO_ROOT
 ```
+- 默认开启 `CORS_ALLOW_ALL_ORIGINS=True`，方便本地前端访问。
+- 若要部署生产，请重新启用认证、限制 CORS、配置 HTTPS。
 
-## 开发指南
+## 安全提示
+此仓库默认面向 **本地单人使用**：
+- 未启用身份验证或权限控制。
+- 所有 API 均可匿名访问。
+- 数据存储在本地文件夹 + SQLite，请注意备份与磁盘权限。
 
-### 添加新功能
-
-1. 在 `apps/core/services/` 添加服务层逻辑
-2. 在对应的 API 模块添加视图
-3. 更新 URL 路由
-4. 编写测试
-
-### 运行测试
-
-```bash
-python test_api_endpoints.py  # 快速验证路由与视图 wiring
-python manage.py test         # 运行 Django 测试用例
-```
-
-`test_api_endpoints.py` 使用 `RequestFactory` 检查 prompt / template 分支是否都能被各个视图接受，可在实现新端点后先跑一遍冒烟测试。
-
-### 代码规范
-
-- 使用 Black 格式化代码
-- 遵循 PEP 8 规范
-- 添加类型提示
-
-## 安全注意事项
-
-- 生产环境必须配置 `DJANGO_SECRET_KEY`
-- 使用 HTTPS
-- 启用 CSRF 保护
-- 实施适当的权限控制
-- 定期备份 Git 仓库
+若需要公网/多用户场景，请恢复 TokenAuth、配置 HTTPS、使用受控的数据库与存储。
 
 ## 许可证
+MIT License。
 
-MIT License
-
-## 贡献
-
-欢迎提交 Issue 和 Pull Request！
+## 贡献方式
+欢迎提交 Issue / PR：
+1. 遵循 Tailwind + shadcn/ui 设计与色板。
+2. 为复杂逻辑补充注释与测试。
+3. 在提交前运行 `python manage.py test` 与 `npm run build`。

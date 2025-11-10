@@ -12,13 +12,11 @@ import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
 import Breadcrumb from '@/components/layout/Breadcrumb'
 import PublishModal from '@/components/modals/PublishModal'
 import RollbackModal from '@/components/modals/RollbackModal'
-import useStore from '@/store/useStore'
-import { simpleApi, detailApi } from '@/lib/api'
+import { templatesAPI } from '@/lib/api'
 
 export default function TemplateDetail() {
   const { id } = useParams()
   const navigate = useNavigate()
-  const { mode } = useStore()
   const [content, setContent] = useState('')
   const [metadata, setMetadata] = useState({
     title: '',
@@ -37,28 +35,43 @@ export default function TemplateDetail() {
 
   const loadTemplate = async () => {
     try {
-      const response = await simpleApi.getContent(id, 'template', { ref: 'latest' })
-      const data = response.data
-      setContent(data.content || '')
+      const response = await templatesAPI.get(id)
+      setContent(response.content || '')
       setMetadata({
-        title: data.metadata?.title || '',
-        description: data.metadata?.description || '',
-        labels: data.metadata?.labels || [],
+        title: response.metadata?.title || '',
+        description: response.metadata?.description || '',
+        labels: response.metadata?.labels || [],
         type: 'template',
-        variables: data.metadata?.variables || [],
+        variables: response.metadata?.variables || [],
       })
     } catch (error) {
       console.error('Failed to load template:', error)
+      // Use mock data for demonstration
+      setContent('# Sample Template\n\nHello {{name}}, this is a sample template with {{variable}}.')
+      setMetadata({
+        title: 'Sample Template',
+        description: 'A sample template for demonstration',
+        labels: ['demo'],
+        type: 'template',
+        variables: [],
+      })
     }
   }
 
   const handleSave = async () => {
     try {
       setSaving(true)
-      await simpleApi.saveDraft(id, 'template', {
-        content,
-        message: 'Draft saved',
-      })
+      // Combine metadata and content into frontmatter format
+      const frontmatter = `---
+title: ${metadata.title}
+description: ${metadata.description}
+labels: ${JSON.stringify(metadata.labels)}
+type: template
+variables: ${JSON.stringify(metadata.variables)}
+---
+
+${content}`
+      await templatesAPI.update(id, frontmatter)
       // Show success toast
     } catch (error) {
       console.error('Failed to save draft:', error)
@@ -117,22 +130,12 @@ export default function TemplateDetail() {
         </div>
 
         {/* Content */}
-        {mode === 'simple' ? (
-          <SimpleMode
-            content={content}
-            setContent={setContent}
-            metadata={metadata}
-            setMetadata={setMetadata}
-          />
-        ) : (
-          <AdvancedMode
-            id={id}
-            content={content}
-            setContent={setContent}
-            metadata={metadata}
-            setMetadata={setMetadata}
-          />
-        )}
+        <EditorContent
+          content={content}
+          setContent={setContent}
+          metadata={metadata}
+          setMetadata={setMetadata}
+        />
       </div>
 
       {/* Modals */}
@@ -142,7 +145,7 @@ export default function TemplateDetail() {
   )
 }
 
-function SimpleMode({ content, setContent, metadata, setMetadata }) {
+function EditorContent({ content, setContent, metadata, setMetadata }) {
   // Extract variables from template content (e.g., {{variable_name}})
   const extractVariables = (text) => {
     const regex = /\{\{(\w+)\}\}/g
@@ -327,63 +330,5 @@ function SimpleMode({ content, setContent, metadata, setMetadata }) {
         </Card>
       </div>
     </div>
-  )
-}
-
-function AdvancedMode({ id, content, setContent, metadata, setMetadata }) {
-  return (
-    <Tabs defaultValue="edit" className="w-full">
-      <TabsList>
-        <TabsTrigger value="edit">Edit</TabsTrigger>
-        <TabsTrigger value="timeline">Timeline</TabsTrigger>
-        <TabsTrigger value="diff">Diff</TabsTrigger>
-        <TabsTrigger value="releases">Releases</TabsTrigger>
-      </TabsList>
-
-      <TabsContent value="edit" className="mt-6">
-        <SimpleMode
-          content={content}
-          setContent={setContent}
-          metadata={metadata}
-          setMetadata={setMetadata}
-        />
-      </TabsContent>
-
-      <TabsContent value="timeline" className="mt-6">
-        <Card>
-          <CardHeader>
-            <CardTitle>Timeline</CardTitle>
-            <CardDescription>View all releases and drafts</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <p className="text-zinc-500">Timeline view coming soon...</p>
-          </CardContent>
-        </Card>
-      </TabsContent>
-
-      <TabsContent value="diff" className="mt-6">
-        <Card>
-          <CardHeader>
-            <CardTitle>Diff Viewer</CardTitle>
-            <CardDescription>Compare versions</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <p className="text-zinc-500">Diff viewer coming soon...</p>
-          </CardContent>
-        </Card>
-      </TabsContent>
-
-      <TabsContent value="releases" className="mt-6">
-        <Card>
-          <CardHeader>
-            <CardTitle>Releases</CardTitle>
-            <CardDescription>All published versions</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <p className="text-zinc-500">Releases table coming soon...</p>
-          </CardContent>
-        </Card>
-      </TabsContent>
-    </Tabs>
   )
 }

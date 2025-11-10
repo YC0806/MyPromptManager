@@ -87,10 +87,13 @@ class IndexService:
                 if not type_filter or type_filter == 'chat':
                     collections.append(index_data.get('chats', []))
 
-                # Flatten and filter
+                # Flatten and sort by updated_at descending (most recent first)
                 all_items = []
                 for collection in collections:
                     all_items.extend(collection)
+
+                # Sort by updated_at (most recent first)
+                all_items.sort(key=lambda x: x.get('updated_at', x.get('created_at', '')), reverse=True)
 
                 # Apply filters
                 for item in all_items:
@@ -121,7 +124,7 @@ class IndexService:
                 next_cursor = results[-1]['id'] if len(results) == limit else None
 
                 return {
-                    'results': results,
+                    'items': results,
                     'count': len(results),
                     'next_cursor': next_cursor,
                 }
@@ -162,6 +165,7 @@ class IndexService:
                 # Create index entry
                 entry = {
                     'id': prompt_id,
+                    'type': item_type,
                     'title': fields['title'],
                     'description': fields['description'],
                     'slug': fields['slug'],
@@ -278,6 +282,7 @@ class IndexService:
                             fields = extract_metadata_fields(prompt)
                             entry = {
                                 'id': fields['id'],
+                                'type': 'prompt',
                                 'title': fields['title'],
                                 'description': fields['description'],
                                 'slug': fields['slug'],
@@ -309,6 +314,7 @@ class IndexService:
                             fields = extract_metadata_fields(template)
                             entry = {
                                 'id': fields['id'],
+                                'type': 'template',
                                 'title': fields['title'],
                                 'description': fields['description'],
                                 'slug': fields['slug'],
@@ -339,6 +345,7 @@ class IndexService:
                         try:
                             entry = {
                                 'id': chat.get('id'),
+                                'type': 'chat',
                                 'title': chat.get('title', ''),
                                 'description': chat.get('description', ''),
                                 'slug': chat.get('id'),  # Use ID as slug for chats

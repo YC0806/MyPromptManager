@@ -280,13 +280,17 @@ export const searchAPI = {
   /**
    * Search across all items
    * @param {Object} params - Search parameters
-   * @returns {Promise<{results: Array, count: number, next_cursor: string}>}
+   * @returns {Promise<{items: Array, count: number, next_cursor: string}>}
    */
   search: async (params = {}) => {
     const query = new URLSearchParams();
     if (params.type) query.append('type', params.type);
     if (params.labels) {
-      params.labels.forEach(label => query.append('labels', label));
+      if (Array.isArray(params.labels)) {
+        params.labels.forEach(label => query.append('labels', label));
+      } else {
+        query.append('labels', params.labels);
+      }
     }
     if (params.slug) query.append('slug', params.slug);
     if (params.author) query.append('author', params.author);

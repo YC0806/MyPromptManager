@@ -27,12 +27,12 @@ import {
 } from '@/components/ui/select'
 import Breadcrumb from '@/components/layout/Breadcrumb'
 import useStore from '@/store/useStore'
-import { commonApi } from '@/lib/api'
+import { searchAPI } from '@/lib/api'
 import { formatDate, getLabelColor, getStatusColor } from '@/lib/utils'
 
 export default function TemplatesList() {
   const navigate = useNavigate()
-  const { viewMode, setViewMode, mode } = useStore()
+  const { viewMode, setViewMode } = useStore()
   const [templates, setTemplates] = useState([])
   const [loading, setLoading] = useState(true)
   const [filters, setFilters] = useState({
@@ -47,12 +47,12 @@ export default function TemplatesList() {
   const loadTemplates = async () => {
     try {
       setLoading(true)
-      const response = await commonApi.search({
+      const response = await searchAPI.search({
         type: 'template', // Only fetch templates
         labels: filters.label || undefined,
         author: filters.author || undefined,
       })
-      setTemplates(response.data.results || [])
+      setTemplates(response.items || [])
     } catch (error) {
       console.error('Failed to load templates:', error)
     } finally {
@@ -124,11 +124,6 @@ export default function TemplatesList() {
                 <LayoutGrid className="w-4 h-4" />
               </Button>
             </div>
-
-            {/* Bulk Actions (Advanced Mode Only) */}
-            {mode === 'advanced' && (
-              <Button variant="outline">Bulk Actions</Button>
-            )}
           </div>
         </div>
 

@@ -1,20 +1,6 @@
 import { create } from 'zustand'
 
 const useStore = create((set) => ({
-  // UI Mode
-  mode: localStorage.getItem('mode') || 'simple', // 'simple' or 'advanced'
-  setMode: (mode) => {
-    localStorage.setItem('mode', mode)
-    set({ mode })
-  },
-
-  // Current Branch (for advanced mode)
-  currentBranch: localStorage.getItem('currentBranch') || 'main',
-  setCurrentBranch: (branch) => {
-    localStorage.setItem('currentBranch', branch)
-    set({ currentBranch: branch })
-  },
-
   // Current Channel
   currentChannel: 'prod', // 'prod' or 'beta'
   setCurrentChannel: (channel) => set({ currentChannel: channel }),

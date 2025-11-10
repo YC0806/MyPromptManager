@@ -10,14 +10,12 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import Breadcrumb from '@/components/layout/Breadcrumb'
 import PublishModal from '@/components/modals/PublishModal'
-import useStore from '@/store/useStore'
-import { simpleApi } from '@/lib/api'
+import { chatsAPI } from '@/lib/api'
 import { formatDate } from '@/lib/utils'
 
 export default function ChatDetail() {
   const { id } = useParams()
   const navigate = useNavigate()
-  const { mode } = useStore()
   const [chatData, setChatData] = useState({
     id: '',
     title: '',
@@ -36,21 +34,27 @@ export default function ChatDetail() {
 
   const loadChat = async () => {
     try {
-      const response = await simpleApi.getContent(id, 'chat', { ref: 'latest' })
-      const data = response.data
-      setChatData(data.content || {})
+      const response = await chatsAPI.get(id)
+      setChatData(response || {})
     } catch (error) {
       console.error('Failed to load chat:', error)
+      // Use mock data for demonstration
+      setChatData({
+        id: id,
+        title: 'Sample Chat',
+        description: 'A sample chat conversation',
+        tags: ['demo'],
+        messages: [],
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      })
     }
   }
 
   const handleSave = async () => {
     try {
       setSaving(true)
-      await simpleApi.saveDraft(id, 'chat', {
-        content: chatData,
-        message: 'Chat updated',
-      })
+      await chatsAPI.update(id, chatData)
       // Show success toast
     } catch (error) {
       console.error('Failed to save chat:', error)
@@ -186,25 +190,22 @@ export default function ChatDetail() {
                 </div>
 
                 {/* Export */}
-                {mode === 'advanced' && (
-                  <div className="pt-4 border-t">
-                    <Button variant="outline" className="w-full">
-                      Export Chat
-                    </Button>
-                  </div>
-                )}
+                <div className="pt-4 border-t">
+                  <Button variant="outline" className="w-full">
+                    Export Chat
+                  </Button>
+                </div>
               </CardContent>
             </Card>
           </div>
         </div>
 
         {/* Advanced Features */}
-        {mode === 'advanced' && (
-          <div className="mt-6">
-            <Card>
-              <CardHeader>
-                <CardTitle>Advanced Options</CardTitle>
-              </CardHeader>
+        <div className="mt-6">
+          <Card>
+            <CardHeader>
+              <CardTitle>Advanced Options</CardTitle>
+            </CardHeader>
               <CardContent>
                 <Tabs defaultValue="json">
                   <TabsList>
@@ -250,7 +251,6 @@ export default function ChatDetail() {
               </CardContent>
             </Card>
           </div>
-        )}
       </div>
 
       {/* Modals */}

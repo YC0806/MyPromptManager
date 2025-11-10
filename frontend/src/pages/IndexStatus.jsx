@@ -5,7 +5,7 @@ import { Badge } from '@/components/ui/badge'
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import Breadcrumb from '@/components/layout/Breadcrumb'
-import { commonApi } from '@/lib/api'
+import { indexAPI } from '@/lib/api'
 
 export default function IndexStatus() {
   const [status, setStatus] = useState(null)
@@ -20,8 +20,8 @@ export default function IndexStatus() {
   const loadStatus = async () => {
     try {
       setLoading(true)
-      const response = await commonApi.getIndexStatus()
-      setStatus(response.data)
+      const response = await indexAPI.status()
+      setStatus(response)
     } catch (error) {
       console.error('Failed to load index status:', error)
       // Use mock data for demonstration
@@ -40,7 +40,7 @@ export default function IndexStatus() {
   const handleRepair = async () => {
     try {
       setRepairing(true)
-      await commonApi.repairIndex()
+      await indexAPI.rebuild() // Note: API doesn't have separate repair endpoint, using rebuild
       await loadStatus()
       // Show success toast
     } catch (error) {
@@ -57,7 +57,7 @@ export default function IndexStatus() {
 
     try {
       setRebuilding(true)
-      await commonApi.rebuildIndex()
+      await indexAPI.rebuild()
       await loadStatus()
       // Show success toast
     } catch (error) {

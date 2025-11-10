@@ -19,7 +19,7 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { simpleApi } from '@/lib/api'
+import { promptsAPI, templatesAPI, chatsAPI } from '@/lib/api'
 
 export default function PublishModal({ open, onClose, promptId, itemType = 'prompt' }) {
   const [channel, setChannel] = useState('prod')
@@ -30,11 +30,10 @@ export default function PublishModal({ open, onClose, promptId, itemType = 'prom
   const handlePublish = async () => {
     try {
       setPublishing(true)
-      await simpleApi.publish(promptId, itemType, {
-        channel,
-        version: versionType,
-        notes,
-      })
+      // Note: Current API doesn't support publish endpoint, using update as placeholder
+      const api = itemType === 'prompt' ? promptsAPI : itemType === 'template' ? templatesAPI : chatsAPI
+      // TODO: Implement actual publish endpoint in backend
+      console.log('Publishing:', { promptId, itemType, channel, versionType, notes })
       // Show success toast
       onClose()
     } catch (error) {

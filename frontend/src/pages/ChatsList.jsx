@@ -20,12 +20,12 @@ import {
 } from '@/components/ui/dropdown-menu'
 import Breadcrumb from '@/components/layout/Breadcrumb'
 import useStore from '@/store/useStore'
-import { commonApi } from '@/lib/api'
+import { searchAPI } from '@/lib/api'
 import { formatDate, getLabelColor } from '@/lib/utils'
 
 export default function ChatsList() {
   const navigate = useNavigate()
-  const { viewMode, setViewMode, mode } = useStore()
+  const { viewMode, setViewMode } = useStore()
   const [chats, setChats] = useState([])
   const [loading, setLoading] = useState(true)
   const [filters, setFilters] = useState({
@@ -40,12 +40,12 @@ export default function ChatsList() {
   const loadChats = async () => {
     try {
       setLoading(true)
-      const response = await commonApi.search({
+      const response = await searchAPI.search({
         type: 'chat', // Only fetch chats
         labels: filters.label || undefined,
         author: filters.author || undefined,
       })
-      setChats(response.data.results || [])
+      setChats(response.items || [])
     } catch (error) {
       console.error('Failed to load chats:', error)
     } finally {
@@ -114,11 +114,6 @@ export default function ChatsList() {
                 <LayoutGrid className="w-4 h-4" />
               </Button>
             </div>
-
-            {/* Bulk Actions (Advanced Mode Only) */}
-            {mode === 'advanced' && (
-              <Button variant="outline">Bulk Actions</Button>
-            )}
           </div>
         </div>
 
