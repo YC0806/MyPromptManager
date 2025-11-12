@@ -1,802 +1,353 @@
 # MyPromptManager API Reference
 
-完整的后端 REST API 文档，包含所有端点的请求和响应格式。
+统一 API 均位于 `http://<host>:8000/v1`，后端默认允许匿名访问（DRF `AllowAny`），输入输出使用 `application/json`。除另行说明外，时间戳为 ISO 8601（UTC）。
 
-**Base URL**: `http://localhost:8000/v1`
+- **认证**：本地开发默认无需认证。
+- **内容类型**：`Content-Type: application/json`
+- **错误格式**：遵循 RFC7807 `application/problem+json`（见下例）。
 
-**认证**: 本地开发环境无需认证（AllowAny）
+```json
+{
+  "type": "about:blank",
+  "title": "ValidationError",
+  "status": 422,
+  "detail": "title is required"
+}
+```
 
-**内容类型**: `application/json`
-
----
-
-## 目录
-
-- [Prompts API](#prompts-api)
-- [Templates API](#templates-api)
-- [Chats API](#chats-api)
-- [Search API](#search-api)
-- [Index Management API](#index-management-api)
-- [Health Check API](#health-check-api)
-- [数据模型](#数据模型)
-- [错误响应](#错误响应)
+> **提示**：所有端点定义在 `apps/api/views.py`，存储逻辑在 `FileStorageService`，索引逻辑在 `IndexService`。以下文档直接对应后端实现。
 
 ---
 
 ## Prompts API
 
-### 列出所有 Prompts
+### 列表 / 创建 `GET | POST /v1/prompts`
+**查询参数**
+| 参数 | 类型 | 默认 | 说明 |
+|------|------|------|------|
+| `labels` | array[string] | - | 必须包含所有指定标签 |
+| `limit` | integer | 100 | 返回数量上限 |
 
-获取所有 prompts 列表，支持过滤和分页。
-
-**端点**: `GET /v1/prompts`
-
-**查询参数**:
-| 参数 | 类型 | 必需 | 默认值 | 说明 |
-|------|------|------|--------|------|
-| `labels` | array[string] | 否 | - | 按标签过滤（可多个） |
-| `limit` | integer | 否 | 100 | 返回结果数量限制 |
-
-**请求示例**:
-```http
-GET /v1/prompts?labels=support&labels=email&limit=50
-```
-
-**响应** (200 OK):
+**GET 响应**
 ```json
 {
   "prompts": [
     {
-      "id": "01HQXYZ123ABC456DEF789",
-      "title": "Personalized Support Reply",
-      "description": "Auto-generate support replies based on context",
+      "id": "01HR...",
+      "title": "Support Reply",
       "type": "prompt",
-      "slug": "support-reply",
       "labels": ["support", "email"],
-      "author": "jane.doe",
-      "created_at": "2024-11-05T08:00:00Z",
       "updated_at": "2024-11-05T09:30:00Z",
-      "version_id": "2024-11-05T09-30Z_A1B2C"
+      "author": "jane.doe"
     }
   ],
   "count": 1,
-  "total": 1
+  "total": 12
 }
 ```
 
----
+**POST 请求体**
+| 字段 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| `title` | string | ✅ | Prompt 名称 |
+| `content` | string | ✅ | 完整 Markdown（含前置 Front Matter） |
+| `labels` | array[string] | ❌ | 标签列表 |
+| `description` | string | ❌ | 描述 |
 
-### 创建 Prompt
+**POST 响应** `201 Created`
+```json
+{ "id": "01HR...", "version_id": "A1B2C", "created_at": "2024-11-09T10:15:00Z" }
+```
 
-创建一个新的 prompt。
-
-**端点**: `POST /v1/prompts`
-
-**请求体**:
+### 详情 `GET /v1/prompts/{prompt_id}`
+返回存储在 `prompt.yaml` 中的 Metadata：
 ```json
 {
-  "content": "---\ntitle: Code Review Assistant\ndescription: Help review code for best practices\nslug: code-review\nlabels:\n  - development\n  - code-quality\nauthor: john.doe\n---\n\n# Code Review Prompt\n\nReview the following code and provide feedback on:\n- Code quality\n- Best practices\n- Potential bugs\n"
-}
-```
-
-**字段说明**:
-- `content` (string, required): 完整的 Markdown 内容，包含 YAML Front Matter
-  - Front Matter 必须包含 `title` 字段
-  - `slug` 可选，未提供时自动从 title 生成
-  - `type` 会自动设置为 "prompt"
-  - 时间戳会自动生成
-
-**响应** (201 Created):
-```json
-{
-  "id": "01HQZ8PQRS9TUV0WXYZ123",
-  "version_id": "2024-11-09T10-15Z_X7Y8Z",
-  "created_at": "2024-11-09T10:15:00Z"
-}
-```
-
----
-
-### 获取 Prompt 详情
-
-获取指定 prompt 的 HEAD 版本详情。
-
-**端点**: `GET /v1/prompts/{prompt_id}`
-
-**路径参数**:
-- `prompt_id` (string, required): Prompt 的 ULID
-
-**响应** (200 OK):
-```json
-{
-  "id": "01HQXYZ123ABC456DEF789",
-  "metadata": {
-    "id": "01HQXYZ123ABC456DEF789",
-    "title": "Personalized Support Reply",
-    "description": "Auto-generate support replies based on context",
-    "type": "prompt",
-    "slug": "support-reply",
-    "labels": ["support", "email"],
-    "author": "jane.doe",
-    "created_at": "2024-11-05T08:00:00Z",
-    "updated_at": "2024-11-05T09:30:00Z"
-  },
-  "content": "# Reply Template\n\nDear {{customer_name}},\n\nThank you for reaching out...",
-  "full_content": "---\nid: 01HQXYZ123ABC456DEF789\ntitle: Personalized Support Reply\n...\n---\n\n# Reply Template\n\nDear {{customer_name}}..."
-}
-```
-
-**错误响应** (404 Not Found):
-```json
-{
-  "detail": "Prompt 01HQXYZ123ABC456DEF789 not found"
-}
-```
-
----
-
-### 更新 Prompt
-
-更新 prompt 内容（创建新版本）。
-
-**端点**: `PUT /v1/prompts/{prompt_id}`
-
-**路径参数**:
-- `prompt_id` (string, required): Prompt 的 ULID
-
-**请求体**:
-```json
-{
-  "content": "---\ntitle: Personalized Support Reply (Updated)\ndescription: Enhanced version with more options\nslug: support-reply\nlabels:\n  - support\n  - email\n  - automation\nauthor: jane.doe\n---\n\n# Enhanced Reply Template\n\nDear {{customer_name}},\n\n{{greeting}}\n\n..."
-}
-```
-
-**响应** (200 OK):
-```json
-{
-  "id": "01HQXYZ123ABC456DEF789",
-  "version_id": "2024-11-09T11-20Z_M9N0P",
-  "updated_at": "2024-11-09T11:20:00Z"
-}
-```
-
----
-
-### 删除 Prompt
-
-删除指定的 prompt（包括所有版本）。
-
-**端点**: `DELETE /v1/prompts/{prompt_id}`
-
-**路径参数**:
-- `prompt_id` (string, required): Prompt 的 ULID
-
-**响应** (204 No Content):
-```
-无响应体
-```
-
----
-
-### 列出 Prompt 版本
-
-获取指定 prompt 的所有历史版本。
-
-**端点**: `GET /v1/prompts/{prompt_id}/versions`
-
-**路径参数**:
-- `prompt_id` (string, required): Prompt 的 ULID
-
-**响应** (200 OK):
-```json
-{
-  "prompt_id": "01HQXYZ123ABC456DEF789",
+  "id": "01HR...",
+  "title": "Support Reply",
+  "type": "prompt",
+  "labels": ["support"],
+  "description": "Auto reply",
+  "updated_at": "2024-11-05T09:30:00Z",
+  "created_at": "2024-11-05T08:00:00Z",
+  "author": "jane.doe",
   "versions": [
-    {
-      "version_id": "2024-11-09T11-20Z_M9N0P",
-      "created_at": "2024-11-09T11:20:00Z",
-      "file_path": "prompts/prompt_support-reply-01HQXYZ123ABC456DEF789/versions/pv_support-reply-01HQXYZ123ABC456DEF789_2024-11-09T11-20Z_M9N0P.md"
-    },
-    {
-      "version_id": "2024-11-05T09-30Z_A1B2C",
-      "created_at": "2024-11-05T09:30:00Z",
-      "file_path": "prompts/prompt_support-reply-01HQXYZ123ABC456DEF789/versions/pv_support-reply-01HQXYZ123ABC456DEF789_2024-11-05T09-30Z_A1B2C.md"
-    }
+    { "id": "A1B2C", "version_number": 1, "created_at": "2024-11-05T08:00:00Z" }
+  ]
+}
+```
+
+### 更新 `PUT /v1/prompts/{prompt_id}`
+**请求体**
+| 字段 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| `version_number` | integer \| string | ✅ | 新版本号（任意语义版本值，后端仅记录） |
+| `content` | string | ✅ | Prompt Markdown 正文；服务端沿用现有 metadata，仅写入正文 |
+
+**响应** `200 OK`
+```json
+{ "id": "01HR...", "version_id": "C3D4E" }
+```
+
+### 删除 `DELETE /v1/prompts/{prompt_id}`
+- 彻底删除 prompt 及其所有版本、索引；返回 `204 No Content`。
+
+### 版本列表 `GET /v1/prompts/{prompt_id}/versions`
+```json
+{
+  "prompt_id": "01HR...",
+  "versions": [
+    { "id": "A1B2C", "version_number": 1, "created_at": "2024-11-05T08:00:00Z" },
+    { "id": "F6G7H", "version_number": 2, "created_at": "2024-11-06T10:00:00Z" }
   ],
   "count": 2
 }
 ```
 
----
-
-### 获取特定版本的 Prompt
-
-获取 prompt 的指定历史版本。
-
-**端点**: `GET /v1/prompts/{prompt_id}/versions/{version_id}`
-
-**路径参数**:
-- `prompt_id` (string, required): Prompt 的 ULID
-- `version_id` (string, required): 版本 ID（格式：`YYYY-MM-DDTHH-MMZ_XXXXX`）
-
-**响应** (200 OK):
+### 版本详情 / 删除 `GET | DELETE /v1/prompts/{prompt_id}/versions/{version_id}`
+**GET 响应**
 ```json
 {
-  "prompt_id": "01HQXYZ123ABC456DEF789",
-  "version_id": "2024-11-05T09-30Z_A1B2C",
+  "prompt_id": "01HR...",
+  "version_id": "F6G7H",
   "metadata": {
-    "id": "01HQXYZ123ABC456DEF789",
-    "title": "Personalized Support Reply",
-    "description": "Auto-generate support replies based on context",
-    "type": "prompt",
-    "slug": "support-reply",
-    "labels": ["support", "email"],
-    "author": "jane.doe",
-    "created_at": "2024-11-05T08:00:00Z",
-    "updated_at": "2024-11-05T09:30:00Z"
+    "id": "F6G7H",
+    "version_number": 2,
+    "created_at": "2024-11-06T10:00:00Z",
+    "author": "jane.doe"
   },
-  "content": "# Reply Template\n\nDear {{customer_name}}..."
+  "content": "# Prompt body ..."
 }
 ```
+**DELETE** 返回 `204 No Content`。
 
 ---
 
 ## Templates API
 
-Templates API 的端点结构与 Prompts API 完全相同，只需将 URL 中的 `prompts` 替换为 `templates`。
+Templates API 与 Prompts 基本一致，额外支持 `variables`。
 
-### 端点列表
+### 列表 / 创建 `GET | POST /v1/templates`
+- 查询参数与响应结构与 Prompts 相同，只是 `type` 为 `template`。
+- `POST` 体：`title`、`content` 必填，`labels`、`description`、`author` 可选。
 
-| 方法 | 端点 | 说明 |
-|------|------|------|
-| GET | `/v1/templates` | 列出所有 templates |
-| POST | `/v1/templates` | 创建新 template |
-| GET | `/v1/templates/{template_id}` | 获取 template 详情 |
-| PUT | `/v1/templates/{template_id}` | 更新 template |
-| DELETE | `/v1/templates/{template_id}` | 删除 template |
-| GET | `/v1/templates/{template_id}/versions` | 列出 template 版本 |
-| GET | `/v1/templates/{template_id}/versions/{version_id}` | 获取特定版本 |
+### 详情 `GET /v1/templates/{template_id}`
+返回当前 HEAD 版本的概要信息：
+```json
+{
+  "id": "01HS...",
+  "version_number": 3,
+  "created_at": "2024-11-07T09:00:00Z",
+  "author": "you",
+  "variables": [
+    { "name": "customer_name", "type": "str" }
+  ]
+}
+```
+> 当前实现返回 HEAD 版本的 VersionData（不含正文）。如需完整内容请调用版本详情接口。
 
-**请求和响应格式与 Prompts API 相同**，唯一区别：
-- 响应中的 `type` 字段为 `"template"`
-- JSON key 使用 `template_id` 而非 `prompt_id`
+### 更新 `PUT /v1/templates/{template_id}`
+**请求体**
+| 字段 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| `version_number` | integer \| string | ✅ | 新版本号（字符串或整数均可） |
+| `content` | string | ✅ | 模板 Markdown 正文；服务端复用现有 metadata 并写入新正文 |
+| `variables` | array[object] | ❌ | 模板变量定义。每项需要 `name`、`type`(`str`/`int`/`float`/`bool`)，可选 `description`、`default_value` |
+
+**响应**
+```json
+{ "id": "01HS...", "version_id": "P9Q0R" }
+```
+
+### 删除 `DELETE /v1/templates/{template_id}`
+- 删除模板与所有版本；返回 `204`。
+
+### 版本列表 `GET /v1/templates/{template_id}/versions`
+结构与 Prompts 相同。
+
+### 版本详情 / 删除 `GET | DELETE /v1/templates/{template_id}/versions/{version_id}`
+**GET 响应**
+```json
+{
+  "template_id": "01HS...",
+  "version_id": "P9Q0R",
+  "metadata": {
+    "id": "P9Q0R",
+    "version_number": 3,
+    "created_at": "2024-11-07T09:00:00Z",
+    "author": "design-system",
+    "variables": [ { "name": "tone", "type": "str" } ]
+  },
+  "content": "# Template body ..."
+}
+```
+**DELETE** 返回 `204 No Content`。
 
 ---
 
 ## Chats API
 
-### 列出所有 Chats
+### 列表 / 创建 `GET | POST /v1/chats`
+**查询参数**
+| 参数 | 类型 | 默认 | 说明 |
+|------|------|------|------|
+| `provider` | string | - | 过滤 provider（忽略大小写） |
+| `limit` | integer | 100 | 数量上限 |
 
-获取所有 chats 列表。
-
-**端点**: `GET /v1/chats`
-
-**查询参数**:
-| 参数 | 类型 | 必需 | 默认值 | 说明 |
-|------|------|------|--------|------|
-| `limit` | integer | 否 | 100 | 返回结果数量限制 |
-
-**响应** (200 OK):
+**GET 响应**
 ```json
 {
   "chats": [
     {
-      "id": "01HR1A2B3C4D5E6F7G8H9J",
-      "title": "Product Feature Discussion",
-      "description": "Discussion about new feature requirements",
-      "tags": ["product", "features"],
+      "id": "01HT...",
+      "title": "Feature Discussion",
+      "provider": "claude",
+      "conversation_id": "chatcmpl-123",
+      "tags": ["product"],
+      "messages": [{"role": "user", "content": "..."}],
+      "turn_count": 5,
       "created_at": "2024-11-08T10:00:00Z",
-      "updated_at": "2024-11-08T15:30:00Z",
-      "message_count": 15
+      "updated_at": "2024-11-08T15:30:00Z"
     }
   ],
   "count": 1,
-  "total": 1
+  "total": 10
 }
 ```
 
----
+**POST 请求体**
+| 字段 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| `title` | string | ✅ | 聊天标题 |
+| `description` | string | ❌ | 描述 |
+| `tags` | array[string] | ❌ | 标签 |
+| `provider` | string | ❌ | AI 提供方（配合 `conversation_id` 做去重） |
+| `conversation_id` | string | ❌ | 第三方会话 ID |
+| `messages` | array[object] | ❌ | `{ role: "user|assistant", content, timestamp }` |
 
-### 创建 Chat
-
-创建一个新的 chat。
-
-**端点**: `POST /v1/chats`
-
-**请求体**:
+- 若提供 `provider + conversation_id`，服务会尝试查找并更新现有聊天，响应 `200 OK`：
 ```json
-{
-  "title": "Project Planning Session",
-  "description": "Planning for Q4 2024 roadmap",
-  "tags": ["planning", "roadmap"],
-  "messages": [
-    {
-      "role": "user",
-      "content": "Let's discuss the Q4 roadmap",
-      "timestamp": "2024-11-09T10:00:00Z"
-    },
-    {
-      "role": "assistant",
-      "content": "I'd be happy to help with that. What are the key priorities?",
-      "timestamp": "2024-11-09T10:00:15Z"
-    }
-  ]
-}
+{ "id": "01HT...", "updated_at": "2024-11-12T12:00:00Z", "message": "Chat updated" }
 ```
-
-**字段说明**:
-- `title` (string, required): Chat 标题
-- `description` (string, optional): Chat 描述
-- `tags` (array[string], optional): 标签列表
-- `messages` (array[object], optional): 消息列表，默认为空数组
-  - `role` (string): "user" 或 "assistant"
-  - `content` (string): 消息内容
-  - `timestamp` (string): ISO 8601 格式时间戳
-
-**响应** (201 Created):
+- 否则创建新聊天，响应 `201 Created`：
 ```json
-{
-  "id": "01HR2X3Y4Z5A6B7C8D9E0F",
-  "created_at": "2024-11-09T10:00:00Z"
-}
+{ "id": "01HT...", "created_at": "2024-11-12T11:58:00Z", "message": "Chat created" }
 ```
 
----
+### 详情 `GET /v1/chats/{chat_id}`
+返回完整聊天 JSON，并自动附加 `turn_count`（统计 user 消息数）。
 
-### 获取 Chat 详情
+### 更新 `PUT /v1/chats/{chat_id}`
+- 请求体：完整聊天对象（至少包含 `title`）。
+- 响应：`{ "id": "01HT...", "updated_at": "2024-11-12T12:30:00Z" }`
 
-获取指定 chat 的完整信息。
-
-**端点**: `GET /v1/chats/{chat_id}`
-
-**路径参数**:
-- `chat_id` (string, required): Chat 的 ULID
-
-**响应** (200 OK):
-```json
-{
-  "id": "01HR1A2B3C4D5E6F7G8H9J",
-  "title": "Product Feature Discussion",
-  "description": "Discussion about new feature requirements",
-  "tags": ["product", "features"],
-  "created_at": "2024-11-08T10:00:00Z",
-  "updated_at": "2024-11-08T15:30:00Z",
-  "messages": [
-    {
-      "role": "user",
-      "content": "We need a new dashboard feature",
-      "timestamp": "2024-11-08T10:00:00Z"
-    },
-    {
-      "role": "assistant",
-      "content": "What specific metrics should the dashboard show?",
-      "timestamp": "2024-11-08T10:00:30Z"
-    }
-  ]
-}
-```
-
----
-
-### 更新 Chat
-
-更新 chat 信息或添加新消息。
-
-**端点**: `PUT /v1/chats/{chat_id}`
-
-**路径参数**:
-- `chat_id` (string, required): Chat 的 ULID
-
-**请求体**:
-```json
-{
-  "title": "Product Feature Discussion (Updated)",
-  "description": "Comprehensive feature planning",
-  "tags": ["product", "features", "planning"],
-  "messages": [
-    {
-      "role": "user",
-      "content": "We need a new dashboard feature",
-      "timestamp": "2024-11-08T10:00:00Z"
-    },
-    {
-      "role": "assistant",
-      "content": "What specific metrics should the dashboard show?",
-      "timestamp": "2024-11-08T10:00:30Z"
-    },
-    {
-      "role": "user",
-      "content": "User engagement metrics and conversion rates",
-      "timestamp": "2024-11-08T15:30:00Z"
-    }
-  ]
-}
-```
-
-**响应** (200 OK):
-```json
-{
-  "id": "01HR1A2B3C4D5E6F7G8H9J",
-  "updated_at": "2024-11-09T11:00:00Z"
-}
-```
-
----
-
-### 删除 Chat
-
-删除指定的 chat。
-
-**端点**: `DELETE /v1/chats/{chat_id}`
-
-**路径参数**:
-- `chat_id` (string, required): Chat 的 ULID
-
-**响应** (204 No Content):
-```
-无响应体
-```
+### 删除 `DELETE /v1/chats/{chat_id}`
+- 删除 JSON 文件并从索引移除；响应 `204`。
 
 ---
 
 ## Search API
 
-### 搜索所有内容
+### `GET /v1/search`
+**查询参数**
+| 参数 | 类型 | 默认 | 说明 |
+|------|------|------|------|
+| `type` | string | - | `prompt` / `template` / `chat`，缺省表示全部 |
+| `labels` | array[string] | - | 必须包含所有指定标签 |
+| `slug` | string | - | 精确匹配 slug |
+| `author` | string | - | 精确匹配作者 |
+| `limit` | integer | 50 | 返回上限 |
+| `cursor` | string | - | 基于 `id` 的游标分页 |
 
-在 prompts、templates 和 chats 中搜索。
-
-**端点**: `GET /v1/search`
-
-**查询参数**:
-| 参数 | 类型 | 必需 | 默认值 | 说明 |
-|------|------|------|--------|------|
-| `type` | string | 否 | - | 过滤类型: "prompt", "template", "chat" |
-| `labels` | array[string] | 否 | - | 按标签过滤（可多个） |
-| `slug` | string | 否 | - | 按 slug 过滤 |
-| `author` | string | 否 | - | 按作者过滤 |
-| `limit` | integer | 否 | 50 | 返回结果数量限制 |
-| `cursor` | string | 否 | - | 分页游标 |
-
-**请求示例**:
-```http
-GET /v1/search?type=prompt&labels=support&author=jane.doe&limit=20
-```
-
-**响应** (200 OK):
+**响应**
 ```json
 {
   "items": [
     {
-      "id": "01HQXYZ123ABC456DEF789",
-      "title": "Personalized Support Reply",
-      "description": "Auto-generate support replies based on context",
+      "id": "01HR...",
       "type": "prompt",
+      "title": "Support Reply",
+      "description": "Auto reply",
       "slug": "support-reply",
-      "labels": ["support", "email"],
+      "labels": ["support"],
       "author": "jane.doe",
       "created_at": "2024-11-05T08:00:00Z",
       "updated_at": "2024-11-05T09:30:00Z",
-      "file_path": "prompts/prompt_support-reply-01HQXYZ123ABC456DEF789/versions/pv_...",
-      "version_id": "2024-11-05T09-30Z_A1B2C"
+      "file_path": "prompts/prompt_support-reply-01HR.../HEAD",
+      "sha": "latest"
     }
   ],
   "count": 1,
-  "total": 1,
-  "cursor": null
+  "next_cursor": null
 }
 ```
 
 ---
 
-## Index Management API
+## Index API
 
-### 获取索引状态
-
-获取当前索引的状态信息。
-
-**端点**: `GET /v1/index/status`
-
-**响应** (200 OK):
+### 状态 `GET /v1/index/status`
 ```json
 {
-  "prompts_count": 42,
-  "templates_count": 18,
-  "chats_count": 7,
-  "last_updated": "2024-11-09T10:30:00Z",
-  "index_size_bytes": 15360
+  "prompts_count": 12,
+  "templates_count": 4,
+  "chats_count": 28,
+  "last_updated": "2024-11-10T12:00:00Z",
+  "index_size_bytes": 40960
 }
 ```
 
----
-
-### 重建索引
-
-从文件系统重建索引。
-
-**端点**: `POST /v1/index/rebuild`
-
-**请求体**: 无需请求体
-
-**响应** (200 OK):
+### 重建 `POST /v1/index/rebuild`
+- 全量扫描 `repo_root`，重写 `index.json`，适用于手动编辑文件或索引损坏。
 ```json
 {
   "status": "completed",
   "stats": {
-    "prompts_indexed": 42,
-    "templates_indexed": 18,
-    "chats_indexed": 7,
-    "total_indexed": 67,
-    "duration_seconds": 1.23
+    "prompts_added": 12,
+    "templates_added": 4,
+    "chats_added": 28,
+    "errors": []
   }
 }
 ```
 
 ---
 
-## Health Check API
+## Health API
 
-### 健康检查
-
-检查 API 和存储系统的健康状态。
-
-**端点**: `GET /v1/health`
-
-**认证**: 不需要（公开端点）
-
-**响应** (200 OK - 健康):
+### `GET /v1/health`
+- 检查 FileStorageService 与 IndexService 是否可用。
 ```json
 {
   "status": "healthy",
-  "storage": {
-    "healthy": true
-  },
+  "storage": { "healthy": true },
   "index": {
     "healthy": true,
-    "prompts_count": 42,
-    "templates_count": 18,
-    "chats_count": 7,
-    "last_updated": "2024-11-09T10:30:00Z",
-    "index_size_bytes": 15360
+    "prompts_count": 12,
+    "templates_count": 4,
+    "chats_count": 28,
+    "last_updated": "2024-11-10T12:00:00Z",
+    "index_size_bytes": 40960
   }
 }
 ```
-
-**响应** (503 Service Unavailable - 不健康):
-```json
-{
-  "status": "unhealthy",
-  "storage": {
-    "healthy": false
-  },
-  "index": {
-    "healthy": false
-  }
-}
-```
+- 若任一失败，`status` 变为 `unhealthy` 且 HTTP 503。
 
 ---
 
-## 数据模型
-
-### Prompt/Template Metadata
-
-Front Matter 中的元数据结构：
-
-```yaml
-id: string              # ULID (26 字符)
-title: string           # 标题 (必需)
-description: string     # 描述
-type: string            # "prompt" 或 "template"
-slug: string            # URL 友好的标识符
-labels: array[string]   # 标签列表
-author: string          # 作者
-created_at: string      # ISO 8601 时间戳
-updated_at: string      # ISO 8601 时间戳
-```
-
-### Chat Data Structure
-
-```json
-{
-  "id": "string",              // ULID
-  "title": "string",           // 标题 (必需)
-  "description": "string",     // 描述
-  "tags": ["string"],          // 标签列表
-  "created_at": "string",      // ISO 8601 时间戳
-  "updated_at": "string",      // ISO 8601 时间戳
-  "messages": [                // 消息数组
-    {
-      "role": "user|assistant",
-      "content": "string",
-      "timestamp": "string"    // ISO 8601 时间戳
-    }
-  ]
-}
-```
-
-### Version ID Format
-
-版本 ID 格式：`{ISO_DATE}T{ISO_TIME}Z_{RANDOM_5CHARS}`
-
-示例：`2024-11-09T10-30Z_A1B2C`
-
-- 日期时间部分：`YYYY-MM-DDTHH-MMZ`
-- 随机后缀：5 个大写字母数字字符
+## 常见状态码
+| 状态码 | 含义 |
+|--------|------|
+| `200 OK` | 成功读取或更新 |
+| `201 Created` | 资源创建成功 |
+| `204 No Content` | 删除成功，无响应体 |
+| `400 Bad Request` | 参数缺失或格式错误 |
+| `404 Not Found` | 资源不存在 |
+| `409 Conflict` | 写入冲突（如版本重复） |
+| `422 Unprocessable Entity` | 语义验证失败 |
+| `423 Locked` | 索引锁定中（并发 rebuild） |
+| `503 Service Unavailable` | `GET /v1/health` 检测失败 |
 
 ---
 
-## 错误响应
-
-所有错误响应遵循统一格式：
-
-### 400 Bad Request
-
-请求参数错误或验证失败。
-
-```json
-{
-  "detail": "content is required"
-}
-```
-
-### 404 Not Found
-
-请求的资源不存在。
-
-```json
-{
-  "detail": "Prompt 01HQXYZ123ABC456DEF789 not found"
-}
-```
-
-### 422 Validation Error
-
-数据验证失败。
-
-```json
-{
-  "detail": "title is required in frontmatter"
-}
-```
-
-### 500 Internal Server Error
-
-服务器内部错误。
-
-```json
-{
-  "detail": "Internal server error"
-}
-```
-
-### 503 Service Unavailable
-
-服务不可用（通常来自健康检查）。
-
-```json
-{
-  "status": "unhealthy",
-  "storage": {
-    "healthy": false
-  },
-  "index": {
-    "healthy": false
-  }
-}
-```
-
----
-
-## 使用示例
-
-### Python (requests)
-
-```python
-import requests
-
-BASE_URL = "http://localhost:8000/v1"
-
-# 创建 Prompt
-content = """---
-title: Test Prompt
-description: A test prompt
-slug: test-prompt
-labels:
-  - test
-author: developer
----
-
-# Test Content
-
-This is a test prompt.
-"""
-
-response = requests.post(
-    f"{BASE_URL}/prompts",
-    json={"content": content}
-)
-print(response.json())
-# {"id": "01HR...", "version_id": "2024-11-09T...", "created_at": "..."}
-
-# 获取 Prompt
-prompt_id = response.json()["id"]
-response = requests.get(f"{BASE_URL}/prompts/{prompt_id}")
-print(response.json())
-
-# 搜索
-response = requests.get(
-    f"{BASE_URL}/search",
-    params={"type": "prompt", "labels": "test"}
-)
-print(response.json())
-```
-
-### JavaScript (fetch)
-
-```javascript
-const BASE_URL = "http://localhost:8000/v1";
-
-// 创建 Prompt
-const content = `---
-title: Test Prompt
-description: A test prompt
-slug: test-prompt
-labels:
-  - test
-author: developer
----
-
-# Test Content
-
-This is a test prompt.
-`;
-
-const createResponse = await fetch(`${BASE_URL}/prompts`, {
-  method: "POST",
-  headers: { "Content-Type": "application/json" },
-  body: JSON.stringify({ content })
-});
-const { id } = await createResponse.json();
-
-// 获取 Prompt
-const getResponse = await fetch(`${BASE_URL}/prompts/${id}`);
-const prompt = await getResponse.json();
-console.log(prompt);
-
-// 搜索
-const searchResponse = await fetch(
-  `${BASE_URL}/search?type=prompt&labels=test`
-);
-const results = await searchResponse.json();
-console.log(results);
-```
-
-### cURL
-
-```bash
-# 健康检查
-curl http://localhost:8000/v1/health
-
-# 列出 Prompts
-curl http://localhost:8000/v1/prompts
-
-# 创建 Prompt
-curl -X POST http://localhost:8000/v1/prompts \
-  -H "Content-Type: application/json" \
-  -d '{
-    "content": "---\ntitle: Test\n---\n\nContent"
-  }'
-
-# 搜索
-curl "http://localhost:8000/v1/search?type=prompt&labels=test"
-```
-
----
-
-**最后更新**: 2025-11-09
-
-**版本**: 1.0
-
-**相关文档**:
-- [项目 README](../README.md)
-- [架构变更说明](ARCHITECTURE_CHANGES.md)
+如需更多示例，可参考 `scripts/api_request_simulator.py` 以及 `frontend/src` 中的 API 调用。EOF
