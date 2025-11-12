@@ -17,13 +17,9 @@ urlpatterns = [
     path('templates/<str:template_id>/versions', views.TemplateVersionsView.as_view(), name='template-versions'),
     path('templates/<str:template_id>/versions/<str:version_id>', views.TemplateVersionDetailView.as_view(), name='template-version-detail'),
 
-    # Chats
+    # Chats (includes AI conversation histories from browser extension)
     path('chats', views.ChatsListView.as_view(), name='chats-list'),
     path('chats/<str:chat_id>', views.ChatDetailView.as_view(), name='chat-detail'),
-
-    # AI Histories
-    path('ai-histories', views.AIHistoriesListView.as_view(), name='ai-histories-list'),
-    path('ai-histories/<str:history_id>', views.AIHistoryDetailView.as_view(), name='ai-history-detail'),
 
     # Search (from common API)
     path('search', views.SearchView.as_view(), name='search'),
