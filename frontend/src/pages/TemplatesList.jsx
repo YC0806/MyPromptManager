@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react'
+import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { FileCode, LayoutGrid, List, MoreVertical, Plus } from 'lucide-react'
 import { Button } from '@/components/ui/button'
@@ -28,7 +28,7 @@ import {
 import Breadcrumb from '@/components/layout/Breadcrumb'
 import useStore from '@/store/useStore'
 import { searchAPI } from '@/lib/api'
-import { formatDate, getLabelColor, getStatusColor } from '@/lib/utils'
+import { formatDate, getLabelColor } from '@/lib/utils'
 
 export default function TemplatesList() {
   const navigate = useNavigate()
@@ -39,20 +39,53 @@ export default function TemplatesList() {
     label: '',
     author: '',
   })
+  const [sortBy, setSortBy] = useState('updated_at')
+  const [sortOrder, setSortOrder] = useState('desc')
+  const [currentPage, setCurrentPage] = useState(1)
+  const [itemsPerPage] = useState(10)
+  const [totalPages, setTotalPages] = useState(1)
 
   useEffect(() => {
     loadTemplates()
-  }, [filters])
+  }, [filters, sortBy, sortOrder, currentPage])
 
   const loadTemplates = async () => {
     try {
       setLoading(true)
       const response = await searchAPI.search({
-        type: 'template', // Only fetch templates
+        type: 'template',
         labels: filters.label || undefined,
         author: filters.author || undefined,
       })
-      setTemplates(response.items || [])
+      let items = response.items || []
+
+      // Client-side sorting
+      items.sort((a, b) => {
+        let aVal = a[sortBy]
+        let bVal = b[sortBy]
+
+        if (sortBy === 'title') {
+          aVal = (aVal || '').toLowerCase()
+          bVal = (bVal || '').toLowerCase()
+        } else if (sortBy === 'updated_at' || sortBy === 'created_at') {
+          aVal = new Date(aVal || 0).getTime()
+          bVal = new Date(bVal || 0).getTime()
+        }
+
+        if (sortOrder === 'asc') {
+          return aVal > bVal ? 1 : -1
+        } else {
+          return aVal < bVal ? 1 : -1
+        }
+      })
+
+      // Client-side pagination
+      const total = Math.ceil(items.length / itemsPerPage)
+      setTotalPages(total)
+      const startIndex = (currentPage - 1) * itemsPerPage
+      const paginatedItems = items.slice(startIndex, startIndex + itemsPerPage)
+
+      setTemplates(paginatedItems)
     } catch (error) {
       console.error('Failed to load templates:', error)
     } finally {
@@ -79,14 +112,17 @@ export default function TemplatesList() {
             </div>
             <p className="text-zinc-600 mt-1">Manage your reusable template files with variables</p>
           </div>
-          <Button className="bg-purple-500 hover:bg-purple-600">
+          <Button
+            className="bg-purple-500 hover:bg-purple-600"
+            onClick={() => navigate('/templates/create')}
+          >
             <Plus className="w-4 h-4 mr-2" />
             New Template
           </Button>
         </div>
 
         {/* Toolbar */}
-        <div className="bg-white rounded-lg shadow-sm p-4 mb-6">
+        <div className="bg-white rounded-lg shadow-sm p-4 mb-6 space-y-4">
           <div className="flex items-center justify-between gap-4">
             {/* Filters */}
             <div className="flex items-center gap-3 flex-1">
@@ -125,6 +161,55 @@ export default function TemplatesList() {
               </Button>
             </div>
           </div>
+
+          {/* Sort and Pagination */}
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <Select value={sortBy} onValueChange={setSortBy}>
+                <SelectTrigger className="w-[180px]">
+                  <SelectValue placeholder="Sort by..." />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="title">Title</SelectItem>
+                  <SelectItem value="author">Creator</SelectItem>
+                  <SelectItem value="updated_at">Updated Time</SelectItem>
+                </SelectContent>
+              </Select>
+
+              <Select value={sortOrder} onValueChange={setSortOrder}>
+                <SelectTrigger className="w-[120px]">
+                  <SelectValue placeholder="Order" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="asc">Ascending</SelectItem>
+                  <SelectItem value="desc">Descending</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Pagination Controls */}
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
+                disabled={currentPage === 1}
+              >
+                Previous
+              </Button>
+              <span className="text-sm text-zinc-600">
+                Page {currentPage} of {totalPages || 1}
+              </span>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setCurrentPage(Math.min(totalPages, currentPage + 1))}
+                disabled={currentPage >= totalPages}
+              >
+                Next
+              </Button>
+            </div>
+          </div>
         </div>
 
         {/* Content */}
@@ -155,16 +240,10 @@ function TableView({ templates, onSelect }) {
               Labels
             </th>
             <th className="text-left px-6 py-3 text-xs font-semibold text-zinc-600 uppercase tracking-wide">
-              Latest Release
-            </th>
-            <th className="text-left px-6 py-3 text-xs font-semibold text-zinc-600 uppercase tracking-wide">
-              Status
-            </th>
-            <th className="text-left px-6 py-3 text-xs font-semibold text-zinc-600 uppercase tracking-wide">
               Updated
             </th>
             <th className="text-left px-6 py-3 text-xs font-semibold text-zinc-600 uppercase tracking-wide">
-              Author
+              Creator
             </th>
             <th className="text-right px-6 py-3 text-xs font-semibold text-zinc-600 uppercase tracking-wide">
               Actions
@@ -199,23 +278,6 @@ function TableView({ templates, onSelect }) {
                   )}
                 </div>
               </td>
-              <td className="px-6 py-4">
-                {template.latestRelease ? (
-                  <div className="flex items-center gap-2">
-                    <Badge variant="outline" className="font-mono text-xs">
-                      {template.latestRelease.version}
-                    </Badge>
-                    <Badge variant={template.latestRelease.channel === 'prod' ? 'success' : 'secondary'}>
-                      {template.latestRelease.channel}
-                    </Badge>
-                  </div>
-                ) : (
-                  <span className="text-zinc-400 text-sm">No releases</span>
-                )}
-              </td>
-              <td className="px-6 py-4">
-                <StatusBadge status={template.draftStatus || 'in_sync'} />
-              </td>
               <td className="px-6 py-4 text-sm text-zinc-600">
                 {formatDate(template.updated_at)}
               </td>
@@ -230,10 +292,8 @@ function TableView({ templates, onSelect }) {
                     </Button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end">
-                    <DropdownMenuItem>Open</DropdownMenuItem>
-                    <DropdownMenuItem>Compare</DropdownMenuItem>
-                    <DropdownMenuItem>Publish</DropdownMenuItem>
-                    <DropdownMenuItem>Rollback</DropdownMenuItem>
+                    <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onSelect(template); }}>Open</DropdownMenuItem>
+                    <DropdownMenuItem onClick={(e) => e.stopPropagation()}>Delete</DropdownMenuItem>
                   </DropdownMenuContent>
                 </DropdownMenu>
               </td>
@@ -256,7 +316,7 @@ function CardsView({ templates, onSelect }) {
       {templates.map((template) => (
         <Card
           key={template.id}
-          className="hover:shadow-md transition-shadow duration-200 cursor-pointer border-l-4 border-l-purple-500"
+          className="hover:shadow-md transition-shadow duration-200 cursor-pointer"
           onClick={() => onSelect(template)}
         >
           <CardHeader>
@@ -269,10 +329,8 @@ function CardsView({ templates, onSelect }) {
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end">
-                  <DropdownMenuItem>Open</DropdownMenuItem>
-                  <DropdownMenuItem>Compare</DropdownMenuItem>
-                  <DropdownMenuItem>Publish</DropdownMenuItem>
-                  <DropdownMenuItem>Rollback</DropdownMenuItem>
+                  <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onSelect(template); }}>Open</DropdownMenuItem>
+                  <DropdownMenuItem onClick={(e) => e.stopPropagation()}>Delete</DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
             </div>
@@ -283,28 +341,12 @@ function CardsView({ templates, onSelect }) {
                   {label}
                 </Badge>
               ))}
-              <Badge className="bg-purple-100 text-purple-700 text-xs">Template</Badge>
             </div>
           </CardHeader>
           <CardContent>
             <CardDescription className="line-clamp-2">
               {template.description || 'No description'}
             </CardDescription>
-            <div className="mt-4 flex justify-between items-center">
-              {template.latestRelease ? (
-                <div className="flex items-center gap-2">
-                  <span className="text-xs text-zinc-500 font-mono">
-                    {template.latestRelease.version}
-                  </span>
-                  <Badge variant="outline" className="text-xs">
-                    {template.latestRelease.channel}
-                  </Badge>
-                </div>
-              ) : (
-                <span className="text-xs text-zinc-400">No releases</span>
-              )}
-              <StatusBadge status={template.draftStatus || 'in_sync'} />
-            </div>
           </CardContent>
           <CardFooter className="text-xs text-zinc-500">
             <span>Updated {formatDate(template.updated_at)}</span>
@@ -319,21 +361,5 @@ function CardsView({ templates, onSelect }) {
         </div>
       )}
     </div>
-  )
-}
-
-function StatusBadge({ status }) {
-  const statusConfig = {
-    in_sync: { label: '✅ In sync', variant: 'success' },
-    draft_ahead: { label: '📝 Draft ahead', variant: 'warning' },
-    behind: { label: '⚠️ Behind', variant: 'destructive' },
-  }
-
-  const config = statusConfig[status] || statusConfig.in_sync
-
-  return (
-    <Badge variant={config.variant} className="text-xs">
-      {config.label}
-    </Badge>
   )
 }

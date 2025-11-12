@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react'
+import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { MessageSquare, LayoutGrid, List, MoreVertical, Plus } from 'lucide-react'
 import { Button } from '@/components/ui/button'
@@ -18,6 +18,13 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 import Breadcrumb from '@/components/layout/Breadcrumb'
 import useStore from '@/store/useStore'
 import { searchAPI } from '@/lib/api'
@@ -32,20 +39,53 @@ export default function ChatsList() {
     label: '',
     author: '',
   })
+  const [sortBy, setSortBy] = useState('created_at')
+  const [sortOrder, setSortOrder] = useState('desc')
+  const [currentPage, setCurrentPage] = useState(1)
+  const [itemsPerPage] = useState(10)
+  const [totalPages, setTotalPages] = useState(1)
 
   useEffect(() => {
     loadChats()
-  }, [filters])
+  }, [filters, sortBy, sortOrder, currentPage])
 
   const loadChats = async () => {
     try {
       setLoading(true)
       const response = await searchAPI.search({
-        type: 'chat', // Only fetch chats
+        type: 'chat',
         labels: filters.label || undefined,
         author: filters.author || undefined,
       })
-      setChats(response.items || [])
+      let items = response.items || []
+
+      // Client-side sorting
+      items.sort((a, b) => {
+        let aVal = a[sortBy]
+        let bVal = b[sortBy]
+
+        if (sortBy === 'title') {
+          aVal = (aVal || '').toLowerCase()
+          bVal = (bVal || '').toLowerCase()
+        } else if (sortBy === 'created_at' || sortBy === 'updated_at') {
+          aVal = new Date(aVal || 0).getTime()
+          bVal = new Date(bVal || 0).getTime()
+        }
+
+        if (sortOrder === 'asc') {
+          return aVal > bVal ? 1 : -1
+        } else {
+          return aVal < bVal ? 1 : -1
+        }
+      })
+
+      // Client-side pagination
+      const total = Math.ceil(items.length / itemsPerPage)
+      setTotalPages(total)
+      const startIndex = (currentPage - 1) * itemsPerPage
+      const paginatedItems = items.slice(startIndex, startIndex + itemsPerPage)
+
+      setChats(paginatedItems)
     } catch (error) {
       console.error('Failed to load chats:', error)
     } finally {
@@ -69,20 +109,23 @@ export default function ChatsList() {
             <h1 className="text-3xl font-bold text-zinc-900">Chats</h1>
             <p className="text-zinc-600 mt-1">Manage your AI conversation history</p>
           </div>
-          <Button className="bg-teal-500 hover:bg-teal-600">
+          <Button
+            className="bg-teal-500 hover:bg-teal-600"
+            onClick={() => navigate('/chats/create')}
+          >
             <Plus className="w-4 h-4 mr-2" />
             New Chat
           </Button>
         </div>
 
         {/* Toolbar */}
-        <div className="bg-white rounded-lg shadow-sm p-4 mb-6">
+        <div className="bg-white rounded-lg shadow-sm p-4 mb-6 space-y-4">
           <div className="flex items-center justify-between gap-4">
             {/* Filters */}
             <div className="flex items-center gap-3 flex-1">
               <Input
                 type="text"
-                placeholder="Filter by tag..."
+                placeholder="Filter by label..."
                 value={filters.label}
                 onChange={(e) => setFilters({ ...filters, label: e.target.value })}
                 className="w-[200px]"
@@ -115,6 +158,55 @@ export default function ChatsList() {
               </Button>
             </div>
           </div>
+
+          {/* Sort and Pagination */}
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <Select value={sortBy} onValueChange={setSortBy}>
+                <SelectTrigger className="w-[180px]">
+                  <SelectValue placeholder="Sort by..." />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="title">Title</SelectItem>
+                  <SelectItem value="author">Creator</SelectItem>
+                  <SelectItem value="created_at">Created Time</SelectItem>
+                </SelectContent>
+              </Select>
+
+              <Select value={sortOrder} onValueChange={setSortOrder}>
+                <SelectTrigger className="w-[120px]">
+                  <SelectValue placeholder="Order" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="asc">Ascending</SelectItem>
+                  <SelectItem value="desc">Descending</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Pagination Controls */}
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
+                disabled={currentPage === 1}
+              >
+                Previous
+              </Button>
+              <span className="text-sm text-zinc-600">
+                Page {currentPage} of {totalPages || 1}
+              </span>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setCurrentPage(Math.min(totalPages, currentPage + 1))}
+                disabled={currentPage >= totalPages}
+              >
+                Next
+              </Button>
+            </div>
+          </div>
         </div>
 
         {/* Content */}
@@ -142,16 +234,13 @@ function TableView({ chats, onSelect }) {
               Title
             </th>
             <th className="text-left px-6 py-3 text-xs font-semibold text-zinc-600 uppercase tracking-wide">
-              Tags
-            </th>
-            <th className="text-left px-6 py-3 text-xs font-semibold text-zinc-600 uppercase tracking-wide">
-              Messages
+              Labels
             </th>
             <th className="text-left px-6 py-3 text-xs font-semibold text-zinc-600 uppercase tracking-wide">
               Created
             </th>
             <th className="text-left px-6 py-3 text-xs font-semibold text-zinc-600 uppercase tracking-wide">
-              Updated
+              Creator
             </th>
             <th className="text-right px-6 py-3 text-xs font-semibold text-zinc-600 uppercase tracking-wide">
               Actions
@@ -188,16 +277,11 @@ function TableView({ chats, onSelect }) {
                   )}
                 </div>
               </td>
-              <td className="px-6 py-4">
-                <span className="text-sm text-zinc-600">
-                  {chat.message_count || 0} messages
-                </span>
-              </td>
               <td className="px-6 py-4 text-sm text-zinc-600">
                 {formatDate(chat.created_at)}
               </td>
               <td className="px-6 py-4 text-sm text-zinc-600">
-                {formatDate(chat.updated_at)}
+                @{chat.author}
               </td>
               <td className="px-6 py-4 text-right">
                 <DropdownMenu>
@@ -207,9 +291,9 @@ function TableView({ chats, onSelect }) {
                     </Button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end">
-                    <DropdownMenuItem>Open</DropdownMenuItem>
-                    <DropdownMenuItem>Export</DropdownMenuItem>
-                    <DropdownMenuItem>Delete</DropdownMenuItem>
+                    <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onSelect(chat); }}>Open</DropdownMenuItem>
+                    <DropdownMenuItem onClick={(e) => e.stopPropagation()}>Export</DropdownMenuItem>
+                    <DropdownMenuItem onClick={(e) => e.stopPropagation()}>Delete</DropdownMenuItem>
                   </DropdownMenuContent>
                 </DropdownMenu>
               </td>
@@ -219,7 +303,7 @@ function TableView({ chats, onSelect }) {
       </table>
       {chats.length === 0 && (
         <div className="text-center py-12 text-zinc-500">
-          No chats found. Start a conversation to create your first chat!
+          No chats found. Create your first chat to get started!
         </div>
       )}
     </div>
@@ -245,9 +329,9 @@ function CardsView({ chats, onSelect }) {
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end">
-                  <DropdownMenuItem>Open</DropdownMenuItem>
-                  <DropdownMenuItem>Export</DropdownMenuItem>
-                  <DropdownMenuItem>Delete</DropdownMenuItem>
+                  <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onSelect(chat); }}>Open</DropdownMenuItem>
+                  <DropdownMenuItem onClick={(e) => e.stopPropagation()}>Export</DropdownMenuItem>
+                  <DropdownMenuItem onClick={(e) => e.stopPropagation()}>Delete</DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
             </div>
@@ -264,20 +348,15 @@ function CardsView({ chats, onSelect }) {
             <CardDescription className="line-clamp-2">
               {chat.description || 'No description'}
             </CardDescription>
-            <div className="mt-4 flex justify-between items-center">
-              <span className="text-sm text-zinc-600">
-                {chat.message_count || 0} messages
-              </span>
-            </div>
           </CardContent>
           <CardFooter className="text-xs text-zinc-500">
-            <span>Updated {formatDate(chat.updated_at)}</span>
+            <span>Created {formatDate(chat.created_at)}</span>
           </CardFooter>
         </Card>
       ))}
       {chats.length === 0 && (
         <div className="col-span-full text-center py-12 text-zinc-500">
-          No chats found. Start a conversation to create your first chat!
+          No chats found. Create your first chat to get started!
         </div>
       )}
     </div>

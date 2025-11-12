@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react'
+import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { FileText, LayoutGrid, List, MoreVertical, Plus } from 'lucide-react'
 import { Button } from '@/components/ui/button'
@@ -39,10 +39,15 @@ export default function PromptsList() {
     label: '',
     author: '',
   })
+  const [sortBy, setSortBy] = useState('updated_at') // 'title', 'author', 'updated_at'
+  const [sortOrder, setSortOrder] = useState('desc') // 'asc' or 'desc'
+  const [currentPage, setCurrentPage] = useState(1)
+  const [itemsPerPage] = useState(10)
+  const [totalPages, setTotalPages] = useState(1)
 
   useEffect(() => {
     loadPrompts()
-  }, [filters])
+  }, [filters, sortBy, sortOrder, currentPage])
 
   const loadPrompts = async () => {
     try {
@@ -52,7 +57,35 @@ export default function PromptsList() {
         labels: filters.label || undefined,
         author: filters.author || undefined,
       })
-      setPrompts(response.items || [])
+      let items = response.items || []
+
+      // Client-side sorting
+      items.sort((a, b) => {
+        let aVal = a[sortBy]
+        let bVal = b[sortBy]
+
+        if (sortBy === 'title') {
+          aVal = (aVal || '').toLowerCase()
+          bVal = (bVal || '').toLowerCase()
+        } else if (sortBy === 'updated_at' || sortBy === 'created_at') {
+          aVal = new Date(aVal || 0).getTime()
+          bVal = new Date(bVal || 0).getTime()
+        }
+
+        if (sortOrder === 'asc') {
+          return aVal > bVal ? 1 : -1
+        } else {
+          return aVal < bVal ? 1 : -1
+        }
+      })
+
+      // Client-side pagination
+      const total = Math.ceil(items.length / itemsPerPage)
+      setTotalPages(total)
+      const startIndex = (currentPage - 1) * itemsPerPage
+      const paginatedItems = items.slice(startIndex, startIndex + itemsPerPage)
+
+      setPrompts(paginatedItems)
     } catch (error) {
       console.error('Failed to load prompts:', error)
     } finally {
@@ -76,14 +109,17 @@ export default function PromptsList() {
             <h1 className="text-3xl font-bold text-zinc-900">Prompts</h1>
             <p className="text-zinc-600 mt-1">Manage your prompt templates and versions</p>
           </div>
-          <Button className="bg-teal-500 hover:bg-teal-600">
+          <Button
+            className="bg-teal-500 hover:bg-teal-600"
+            onClick={() => navigate('/prompts/create')}
+          >
             <Plus className="w-4 h-4 mr-2" />
             New Prompt
           </Button>
         </div>
 
         {/* Toolbar */}
-        <div className="bg-white rounded-lg shadow-sm p-4 mb-6">
+        <div className="bg-white rounded-lg shadow-sm p-4 mb-6 space-y-4">
           <div className="flex items-center justify-between gap-4">
             {/* Filters */}
             <div className="flex items-center gap-3 flex-1">
@@ -122,6 +158,55 @@ export default function PromptsList() {
               </Button>
             </div>
           </div>
+
+          {/* Sort and Pagination */}
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <Select value={sortBy} onValueChange={setSortBy}>
+                <SelectTrigger className="w-[180px]">
+                  <SelectValue placeholder="Sort by..." />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="title">Title</SelectItem>
+                  <SelectItem value="author">Creator</SelectItem>
+                  <SelectItem value="updated_at">Updated Time</SelectItem>
+                </SelectContent>
+              </Select>
+
+              <Select value={sortOrder} onValueChange={setSortOrder}>
+                <SelectTrigger className="w-[120px]">
+                  <SelectValue placeholder="Order" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="asc">Ascending</SelectItem>
+                  <SelectItem value="desc">Descending</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Pagination Controls */}
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
+                disabled={currentPage === 1}
+              >
+                Previous
+              </Button>
+              <span className="text-sm text-zinc-600">
+                Page {currentPage} of {totalPages || 1}
+              </span>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setCurrentPage(Math.min(totalPages, currentPage + 1))}
+                disabled={currentPage >= totalPages}
+              >
+                Next
+              </Button>
+            </div>
+          </div>
         </div>
 
         {/* Content */}
@@ -130,16 +215,16 @@ export default function PromptsList() {
             <p className="text-zinc-500">Loading prompts...</p>
           </div>
         ) : viewMode === 'table' ? (
-          <TableView prompts={prompts} onSelect={(prompt) => navigate(`/prompts/${prompt.id}`)} />
+          <TableView prompts={prompts} onSelect={(prompt) => navigate(`/prompts/${prompt.id}`)} navigate={navigate} />
         ) : (
-          <CardsView prompts={prompts} onSelect={(prompt) => navigate(`/prompts/${prompt.id}`)} />
+          <CardsView prompts={prompts} onSelect={(prompt) => navigate(`/prompts/${prompt.id}`)} navigate={navigate} />
         )}
       </div>
     </div>
   )
 }
 
-function TableView({ prompts, onSelect }) {
+function TableView({ prompts, onSelect, navigate }) {
   return (
     <div className="bg-white rounded-lg shadow-sm overflow-hidden">
       <table className="w-full">
@@ -227,10 +312,10 @@ function TableView({ prompts, onSelect }) {
                     </Button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end">
-                    <DropdownMenuItem>Open</DropdownMenuItem>
-                    <DropdownMenuItem>Compare</DropdownMenuItem>
-                    <DropdownMenuItem>Publish</DropdownMenuItem>
-                    <DropdownMenuItem>Rollback</DropdownMenuItem>
+                    <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onSelect(prompt); }}>Open</DropdownMenuItem>
+                    <DropdownMenuItem onClick={(e) => { e.stopPropagation(); navigate(`/prompts/${prompt.id}/compare`); }}>Compare</DropdownMenuItem>
+                    <DropdownMenuItem onClick={(e) => { e.stopPropagation(); /* TODO: Add publish modal */ }}>Publish</DropdownMenuItem>
+                    <DropdownMenuItem onClick={(e) => { e.stopPropagation(); /* TODO: Add rollback modal */ }}>Rollback</DropdownMenuItem>
                   </DropdownMenuContent>
                 </DropdownMenu>
               </td>
@@ -247,7 +332,7 @@ function TableView({ prompts, onSelect }) {
   )
 }
 
-function CardsView({ prompts, onSelect }) {
+function CardsView({ prompts, onSelect, navigate }) {
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
       {prompts.map((prompt) => (
@@ -266,10 +351,10 @@ function CardsView({ prompts, onSelect }) {
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end">
-                  <DropdownMenuItem>Open</DropdownMenuItem>
-                  <DropdownMenuItem>Compare</DropdownMenuItem>
-                  <DropdownMenuItem>Publish</DropdownMenuItem>
-                  <DropdownMenuItem>Rollback</DropdownMenuItem>
+                  <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onSelect(prompt); }}>Open</DropdownMenuItem>
+                  <DropdownMenuItem onClick={(e) => { e.stopPropagation(); navigate(`/prompts/${prompt.id}/compare`); }}>Compare</DropdownMenuItem>
+                  <DropdownMenuItem onClick={(e) => { e.stopPropagation(); /* TODO: Add publish modal */ }}>Publish</DropdownMenuItem>
+                  <DropdownMenuItem onClick={(e) => { e.stopPropagation(); /* TODO: Add rollback modal */ }}>Rollback</DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
             </div>

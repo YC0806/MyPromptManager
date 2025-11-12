@@ -1,6 +1,6 @@
-import { useState, useEffect } from 'react'
-import { useParams, useNavigate } from 'react-router-dom'
-import { Save, X, Clock, FileCode } from 'lucide-react'
+import { useState } from 'react'
+import { useNavigate } from 'react-router-dom'
+import { Save, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -9,77 +9,20 @@ import { Badge } from '@/components/ui/badge'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import Breadcrumb from '@/components/layout/Breadcrumb'
 import { templatesAPI } from '@/lib/api'
-import { formatDate } from '@/lib/utils'
 
-export default function TemplateDetail() {
-  const { id } = useParams()
+export default function TemplateCreate() {
   const navigate = useNavigate()
-  const [template, setTemplate] = useState(null)
-  const [versions, setVersions] = useState([])
-  const [selectedVersion, setSelectedVersion] = useState(null)
-  const [content, setContent] = useState('')
   const [metadata, setMetadata] = useState({
     title: '',
     description: '',
     labels: [],
-    variables: []
+    variables: [] // Array of { name, description, default }
   })
+  const [content, setContent] = useState('')
   const [newLabel, setNewLabel] = useState('')
   const [saving, setSaving] = useState(false)
-  const [loading, setLoading] = useState(true)
 
-  useEffect(() => {
-    loadTemplate()
-    loadVersions()
-  }, [id])
-
-  const loadTemplate = async () => {
-    try {
-      setLoading(true)
-      const response = await templatesAPI.get(id)
-      setTemplate(response)
-      setContent(response.content || '')
-      setMetadata({
-        title: response.metadata?.title || '',
-        description: response.metadata?.description || '',
-        labels: response.metadata?.labels || [],
-        variables: response.metadata?.variables || []
-      })
-    } catch (error) {
-      console.error('Failed to load template:', error)
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  const loadVersions = async () => {
-    try {
-      const response = await templatesAPI.listVersions(id)
-      setVersions(response.versions || [])
-      if (response.versions && response.versions.length > 0) {
-        setSelectedVersion(response.versions[0].version_id)
-      }
-    } catch (error) {
-      console.error('Failed to load versions:', error)
-    }
-  }
-
-  const handleVersionSelect = async (versionId) => {
-    try {
-      setSelectedVersion(versionId)
-      const versionData = await templatesAPI.getVersion(id, versionId)
-      setContent(versionData.content || '')
-      setMetadata({
-        title: versionData.metadata?.title || '',
-        description: versionData.metadata?.description || '',
-        labels: versionData.metadata?.labels || [],
-        variables: versionData.metadata?.variables || []
-      })
-    } catch (error) {
-      console.error('Failed to load version:', error)
-    }
-  }
-
+  // Extract variables from content
   const extractVariables = (text) => {
     const regex = /\{\{(\w+)\}\}/g
     const matches = [...text.matchAll(regex)]
@@ -87,16 +30,6 @@ export default function TemplateDetail() {
   }
 
   const detectedVariables = extractVariables(content)
-
-  const handleVariableChange = (varName, field, value) => {
-    const updatedVars = metadata.variables.filter(v => v.name !== varName)
-    updatedVars.push({
-      name: varName,
-      description: field === 'description' ? value : (metadata.variables.find(v => v.name === varName)?.description || ''),
-      default: field === 'default' ? value : (metadata.variables.find(v => v.name === varName)?.default || '')
-    })
-    setMetadata({ ...metadata, variables: updatedVars })
-  }
 
   const handleAddLabel = () => {
     if (newLabel.trim() && !metadata.labels.includes(newLabel.trim())) {
@@ -112,7 +45,17 @@ export default function TemplateDetail() {
     })
   }
 
-  const handleSaveNewVersion = async () => {
+  const handleVariableChange = (varName, field, value) => {
+    const updatedVars = metadata.variables.filter(v => v.name !== varName)
+    updatedVars.push({
+      name: varName,
+      description: field === 'description' ? value : (metadata.variables.find(v => v.name === varName)?.description || ''),
+      default: field === 'default' ? value : (metadata.variables.find(v => v.name === varName)?.default || '')
+    })
+    setMetadata({ ...metadata, variables: updatedVars })
+  }
+
+  const handleSave = async () => {
     try {
       setSaving(true)
       const frontmatter = `---
@@ -125,13 +68,11 @@ variables: ${JSON.stringify(metadata.variables)}
 
 ${content}`
 
-      await templatesAPI.update(id, frontmatter)
-      await loadTemplate()
-      await loadVersions()
-      alert('New version saved successfully!')
+      const response = await templatesAPI.create(frontmatter)
+      navigate(`/templates/${response.id}`)
     } catch (error) {
-      console.error('Failed to save new version:', error)
-      alert('Failed to save: ' + error.message)
+      console.error('Failed to create template:', error)
+      alert('Failed to create template: ' + error.message)
     } finally {
       setSaving(false)
     }
@@ -140,19 +81,8 @@ ${content}`
   const breadcrumbItems = [
     { label: 'Home', href: '/' },
     { label: 'Templates', href: '/templates' },
-    { label: metadata.title || 'Loading...' },
+    { label: 'Create New Template' },
   ]
-
-  if (loading) {
-    return (
-      <div className="min-h-screen">
-        <Breadcrumb items={breadcrumbItems} />
-        <div className="flex items-center justify-center h-64">
-          <p className="text-zinc-500">Loading template...</p>
-        </div>
-      </div>
-    )
-  }
 
   return (
     <div className="min-h-screen">
@@ -162,50 +92,48 @@ ${content}`
         {/* Header */}
         <div className="flex items-center justify-between mb-6">
           <div>
-            <div className="flex items-center gap-3">
-              <FileCode className="w-8 h-8 text-purple-500" />
-              <h1 className="text-3xl font-bold text-zinc-900">{metadata.title}</h1>
-            </div>
-            <div className="flex gap-2 mt-2">
-              {metadata.labels.map((label, idx) => (
-                <Badge key={idx} variant="outline">{label}</Badge>
-              ))}
-              <Badge className="bg-purple-100 text-purple-700">Template</Badge>
-            </div>
+            <h1 className="text-3xl font-bold text-zinc-900">Create New Template</h1>
+            <p className="text-zinc-600 mt-1">Create a reusable template with variables</p>
           </div>
           <div className="flex gap-2">
             <Button variant="outline" onClick={() => navigate('/templates')}>
               <X className="w-4 h-4 mr-2" />
-              Close
+              Cancel
             </Button>
             <Button
               className="bg-purple-500 hover:bg-purple-600"
-              onClick={handleSaveNewVersion}
-              disabled={saving}
+              onClick={handleSave}
+              disabled={saving || !metadata.title.trim() || !content.trim()}
             >
               <Save className="w-4 h-4 mr-2" />
-              {saving ? 'Saving...' : 'Save as New Version'}
+              {saving ? 'Creating...' : 'Create Template'}
             </Button>
           </div>
         </div>
 
-        {/* Content Layout: Left (Main) + Right (Secondary) */}
+        {/* Content */}
         <div className="grid grid-cols-12 gap-6">
-          {/* Main Content Area - Left (8/12) */}
+          {/* Editor (Main - 8/12) */}
           <div className="col-span-8">
             <Card>
               <CardHeader>
-                <CardTitle>Content Editor</CardTitle>
+                <CardTitle>Template Content</CardTitle>
                 <CardDescription>
-                  Edit template content with {`{{variable}}`} placeholders
+                  Use {`{{variable_name}}`} syntax for variables
                 </CardDescription>
               </CardHeader>
               <CardContent>
                 <Textarea
                   value={content}
                   onChange={(e) => setContent(e.target.value)}
-                  className="min-h-[600px] font-mono text-sm"
-                  placeholder="Enter your template content with variables..."
+                  className="min-h-[500px] font-mono text-sm"
+                  placeholder="Enter your template content...
+
+# Example Template
+
+Hello {{name}}, welcome to {{project}}!
+
+Use {{variable}} syntax for dynamic values."
                 />
                 <div className="flex items-center justify-between mt-4 text-xs text-zinc-500">
                   <span>
@@ -216,15 +144,15 @@ ${content}`
               </CardContent>
             </Card>
 
-            {/* Variable Descriptions */}
+            {/* Detected Variables */}
             {detectedVariables.length > 0 && (
               <Card className="mt-6">
                 <CardHeader>
                   <CardTitle>Variable Descriptions</CardTitle>
-                  <CardDescription>Define descriptions and defaults for detected variables</CardDescription>
+                  <CardDescription>Define descriptions and defaults for each variable</CardDescription>
                 </CardHeader>
                 <CardContent>
-                  <div className="space-y-3">
+                  <div className="space-y-4">
                     {detectedVariables.map((varName) => (
                       <div key={varName} className="p-4 bg-purple-50 rounded-lg border border-purple-200">
                         <div className="font-mono text-sm font-semibold text-purple-700 mb-3">
@@ -250,22 +178,22 @@ ${content}`
             )}
           </div>
 
-          {/* Secondary Content Area - Right (4/12) */}
+          {/* Metadata Panel (Secondary - 4/12) */}
           <div className="col-span-4 space-y-6">
-            {/* Metadata */}
             <Card>
               <CardHeader>
                 <CardTitle>Metadata</CardTitle>
-                <CardDescription>Edit template properties</CardDescription>
+                <CardDescription>Define template properties</CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div>
-                  <Label htmlFor="title">Title</Label>
+                  <Label htmlFor="title">Title *</Label>
                   <Input
                     id="title"
                     value={metadata.title}
                     onChange={(e) => setMetadata({ ...metadata, title: e.target.value })}
                     placeholder="Enter title..."
+                    required
                   />
                 </div>
 
@@ -310,54 +238,15 @@ ${content}`
               </CardContent>
             </Card>
 
-            {/* Version History */}
-            <Card>
+            <Card className="bg-purple-50 border-purple-200">
               <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Clock className="w-5 h-5" />
-                  Version History
-                </CardTitle>
-                <CardDescription>
-                  Select a version (latest at top)
-                </CardDescription>
+                <CardTitle className="text-purple-900">Tips</CardTitle>
               </CardHeader>
-              <CardContent>
-                <div className="space-y-2">
-                  {versions.length === 0 ? (
-                    <p className="text-sm text-zinc-500">No versions yet</p>
-                  ) : (
-                    versions.map((version) => (
-                      <div
-                        key={version.version_id}
-                        className={`p-3 rounded-lg border cursor-pointer transition-colors ${
-                          selectedVersion === version.version_id
-                            ? 'bg-purple-50 border-purple-300'
-                            : 'bg-white hover:bg-zinc-50'
-                        }`}
-                        onClick={() => handleVersionSelect(version.version_id)}
-                      >
-                        <div className="flex items-center justify-between">
-                          <div className="flex-1">
-                            <p className="font-mono text-sm font-semibold text-zinc-900">
-                              {version.version_id.substring(0, 8)}
-                            </p>
-                            <p className="text-xs text-zinc-500 mt-1">
-                              {formatDate(version.created_at)}
-                            </p>
-                            {version.metadata?.variables && (
-                              <p className="text-xs text-purple-600 mt-1">
-                                {version.metadata.variables.length} variables
-                              </p>
-                            )}
-                          </div>
-                          {selectedVersion === version.version_id && (
-                            <Badge variant="success" className="ml-2">Current</Badge>
-                          )}
-                        </div>
-                      </div>
-                    ))
-                  )}
-                </div>
+              <CardContent className="text-sm text-purple-800 space-y-2">
+                <p>• Use {`{{variable}}`} syntax for placeholders</p>
+                <p>• Add descriptions to help users understand variables</p>
+                <p>• Provide default values when appropriate</p>
+                <p>• You can create new versions later</p>
               </CardContent>
             </Card>
           </div>
