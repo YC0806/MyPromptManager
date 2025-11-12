@@ -5,12 +5,14 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
 from django.conf import settings
-from datetime import datetime
+import datetime
 
 from apps.core.services.file_storage_service import FileStorageService
 from apps.core.services.index_service import IndexService
 from apps.core.utils.frontmatter import parse_frontmatter, serialize_frontmatter
 from apps.core.exceptions import ResourceNotFoundError, ValidationError, BadRequestError
+from apps.core.domain.metadata import Metadata
+from apps.core.domain.version import TemplateVariable
 
 
 # ============================================================================
@@ -26,72 +28,74 @@ class PromptsListView(APIView):
     def get(self, request):
         """List all prompts."""
         storage = FileStorageService()
+
+        # TODO optimize with indexing
         prompts = storage.list_all_items('prompt')
 
         # Apply filters if provided
-        type_filter = request.query_params.get('type')
         labels = request.query_params.getlist('labels')
         limit = int(request.query_params.get('limit', 100))
 
         if labels:
-            prompts = [p for p in prompts if all(label in p.get('labels', []) for label in labels)]
+            prompts = [p for p in prompts if all(label in p.labels for label in labels)]
 
         # Sort by updated_at descending
-        prompts.sort(key=lambda x: x.get('updated_at', ''), reverse=True)
+        prompts.sort(key=lambda x: x.updated_at or x.created_at or "", reverse=True)
 
         return Response({
-            'prompts': prompts[:limit],
+            'prompts': [p.to_summary().__dict__() for p in prompts[:limit]],
             'count': len(prompts[:limit]),
             'total': len(prompts),
         })
 
     def post(self, request):
         """Create a new prompt."""
+        title = request.data.get('title')
         content = request.data.get('content')
+        labels = request.data.get('labels', [])
+        description = request.data.get('description', '')
+        author = "You"  # Default author
+        now = datetime.datetime.now(datetime.timezone.utc).isoformat()
+
+        if not title:
+            raise BadRequestError("title is required")
         if not content:
             raise BadRequestError("content is required")
 
-        # Parse frontmatter
-        metadata, body = parse_frontmatter(content)
-
-        # Validate required fields
-        if not metadata.get('title'):
-            raise ValidationError("title is required in frontmatter")
-        if not metadata.get('slug'):
-            metadata['slug'] = metadata.get('title', '').lower().replace(' ', '-')[:50]
-
-        # Set type
-        metadata['type'] = 'prompt'
-
-        # Set timestamps
-        metadata['created_at'] = metadata.get('created_at') or datetime.utcnow().isoformat()
-        metadata['updated_at'] = datetime.utcnow().isoformat()
+        metadata = Metadata(
+            id='',
+            title=title,
+            type='prompt',
+            labels=labels,
+            description=description,
+            updated_at=now,
+            created_at=now,
+            author=author,
+            versions=[]
+        )
 
         # Create prompt
         storage = FileStorageService()
-        item_id, version_id = storage.create_item('prompt', metadata, body)
+        item_id, version_id = storage.create_item('prompt', metadata, content, None)
 
         # Add to index
         index_service = IndexService()
-        slug = metadata['slug']
-        metadata['id'] = item_id  # Add ID to metadata for indexing
         index_service.add_or_update(
             item_id,
-            metadata,
-            f"prompts/prompt_{slug}-{item_id}/versions/pv_{slug}-{item_id}_{version_id}.md",
+            metadata.__dict__(),
+            f"prompts/prompt-{item_id}/versions/pv-{item_id}_{version_id}.md",
             version_id
         )
 
         return Response({
             'id': item_id,
-            'version_id': version_id,
-            'created_at': metadata['created_at'],
+            'version_id': version_id
         }, status=status.HTTP_201_CREATED)
 
 
 class PromptDetailView(APIView):
     """
-    GET /v1/prompts/{id} - Get prompt (HEAD version)
+    GET /v1/prompts/{id} - Get prompt metadata
     PUT /v1/prompts/{id} - Update prompt (create new version)
     DELETE /v1/prompts/{id} - Delete prompt
     """
@@ -106,23 +110,18 @@ class PromptDetailView(APIView):
         if not entry:
             raise ResourceNotFoundError(f"Prompt {prompt_id} not found")
 
-        slug = entry['slug']
+        metadata = storage.load_metadata('prompt', prompt_id)
 
-        # Read HEAD version
-        metadata, content = storage.read_version('prompt', prompt_id, slug)
-
-        return Response({
-            'id': prompt_id,
-            'metadata': metadata,
-            'content': content,
-            'full_content': serialize_frontmatter(metadata, content),
-        })
+        return Response(metadata.__dict__())
 
     def put(self, request, prompt_id):
         """Update prompt (creates new version)."""
+        version_number = request.data.get('version_number')
         content = request.data.get('content')
         if not content:
             raise BadRequestError("content is required")
+        if version_number is None:
+            raise BadRequestError("version_number is required")
 
         storage = FileStorageService()
         index_service = IndexService()
@@ -132,16 +131,11 @@ class PromptDetailView(APIView):
         if not entry:
             raise ResourceNotFoundError(f"Prompt {prompt_id} not found")
 
-        slug = entry['slug']
-
-        # Parse new content
-        metadata, body = parse_frontmatter(content)
-        metadata['id'] = prompt_id
-        metadata['type'] = 'prompt'
-        metadata['updated_at'] = datetime.utcnow().isoformat()
+        # Get existing metadata
+        metadata = storage.load_metadata('prompt', prompt_id)
 
         # Create new version
-        version_id = storage.create_version('prompt', prompt_id, slug, metadata, body)
+        version_id = storage.create_version(metadata, version_number, content, None)
 
         # Update index
         index_service.add_or_update(
@@ -153,8 +147,7 @@ class PromptDetailView(APIView):
 
         return Response({
             'id': prompt_id,
-            'version_id': version_id,
-            'updated_at': metadata['updated_at'],
+            'version_id': version_id
         })
 
     def delete(self, request, prompt_id):
@@ -167,10 +160,8 @@ class PromptDetailView(APIView):
         if not entry:
             raise ResourceNotFoundError(f"Prompt {prompt_id} not found")
 
-        slug = entry['slug']
-
         # Delete from storage
-        storage.delete_item('prompt', prompt_id, slug)
+        storage.delete_item('prompt', prompt_id)
 
         # Remove from index
         index_service.remove(prompt_id)
@@ -193,14 +184,12 @@ class PromptVersionsView(APIView):
         if not entry:
             raise ResourceNotFoundError(f"Prompt {prompt_id} not found")
 
-        slug = entry['slug']
-
         # Get versions
-        versions = storage.list_versions('prompt', prompt_id, slug)
+        versions = storage.list_versions('prompt', prompt_id)
 
         return Response({
             'prompt_id': prompt_id,
-            'versions': versions,
+            'versions': [v.__dict__() for v in versions],
             'count': len(versions),
         })
 
@@ -208,6 +197,7 @@ class PromptVersionsView(APIView):
 class PromptVersionDetailView(APIView):
     """
     GET /v1/prompts/{id}/versions/{version_id} - Get specific version
+    DELETE /v1/prompts/{id}/versions/{version_id} - Delete specific version
     """
 
     def get(self, request, prompt_id, version_id):
@@ -220,18 +210,29 @@ class PromptVersionDetailView(APIView):
         if not entry:
             raise ResourceNotFoundError(f"Prompt {prompt_id} not found")
 
-        slug = entry['slug']
-
         # Read specific version
-        metadata, content = storage.read_version('prompt', prompt_id, slug, version_id)
+        version_data = storage.read_version('prompt', prompt_id, version_id)
 
         return Response({
             'prompt_id': prompt_id,
-            'version_id': version_id,
-            'metadata': metadata,
-            'content': content,
+            'frontmatter': version_data.__dict__(),
+            'content': version_data.content,
         })
 
+    def delete(self, request, prompt_id, version_id):
+        """Delete a specific version of a prompt."""
+        storage = FileStorageService()
+        index_service = IndexService()
+
+        # Get from index to find slug
+        entry = index_service.get_by_id(prompt_id)
+        if not entry:
+            raise ResourceNotFoundError(f"Prompt {prompt_id} not found")
+
+        # Delete specific version
+        storage.delete_version('prompt', prompt_id, version_id)
+
+        return Response(status=status.HTTP_204_NO_CONTENT)
 
 # ============================================================================
 # Templates
@@ -253,58 +254,59 @@ class TemplatesListView(APIView):
         limit = int(request.query_params.get('limit', 100))
 
         if labels:
-            templates = [t for t in templates if all(label in t.get('labels', []) for label in labels)]
+            templates = [t for t in templates if all(label in t.labels for label in labels)]
 
         # Sort by updated_at descending
-        templates.sort(key=lambda x: x.get('updated_at', ''), reverse=True)
+        templates.sort(key=lambda x: x.updated_at or x.created_at or "", reverse=True)
 
         return Response({
-            'templates': templates[:limit],
+            'templates': [t.to_summary().__dict__() for t in templates[:limit]],
             'count': len(templates[:limit]),
             'total': len(templates),
         })
 
     def post(self, request):
         """Create a new template."""
+        title = request.data.get('title')
         content = request.data.get('content')
+        labels = request.data.get('labels', [])
+        description = request.data.get('description', '')
+        author = "You"
+        now = datetime.datetime.now(datetime.timezone.utc).isoformat()
+
+        if not title:
+            raise BadRequestError("title is required")
         if not content:
             raise BadRequestError("content is required")
+        
+        variables = [TemplateVariable.from_dict(v) for v in request.data.get('variables', [])]
 
-        # Parse frontmatter
-        metadata, body = parse_frontmatter(content)
+        metadata = Metadata(
+            id='',
+            title=title,
+            type='template',
+            labels=labels,
+            description=description,
+            updated_at=now,
+            created_at=now,
+            author=author,
+            versions=[]
+        )
 
-        # Validate required fields
-        if not metadata.get('title'):
-            raise ValidationError("title is required in frontmatter")
-        if not metadata.get('slug'):
-            metadata['slug'] = metadata.get('title', '').lower().replace(' ', '-')[:50]
-
-        # Set type
-        metadata['type'] = 'template'
-
-        # Set timestamps
-        metadata['created_at'] = metadata.get('created_at') or datetime.utcnow().isoformat()
-        metadata['updated_at'] = datetime.utcnow().isoformat()
-
-        # Create template
         storage = FileStorageService()
-        item_id, version_id = storage.create_item('template', metadata, body)
+        item_id, version_id = storage.create_item('template', metadata, content, variables)
 
-        # Add to index
         index_service = IndexService()
-        slug = metadata['slug']
-        metadata['id'] = item_id  # Add ID to metadata for indexing
         index_service.add_or_update(
             item_id,
-            metadata,
-            f"templates/template_{slug}-{item_id}/versions/tv_{slug}-{item_id}_{version_id}.md",
+            metadata.__dict__(),
+            f"templates/template-{item_id}/versions/tv-{item_id}_{version_id}.md",
             version_id
         )
 
         return Response({
             'id': item_id,
             'version_id': version_id,
-            'created_at': metadata['created_at'],
         }, status=status.HTTP_201_CREATED)
 
 
@@ -325,22 +327,22 @@ class TemplateDetailView(APIView):
         if not entry:
             raise ResourceNotFoundError(f"Template {template_id} not found")
 
-        slug = entry['slug']
-
         # Read HEAD version
-        metadata, content = storage.read_version('template', template_id, slug)
+        metadata = storage.load_metadata('template', template_id)
 
-        return Response({
-            'id': template_id,
-            'metadata': metadata,
-            'content': content,
-        })
+        return Response(metadata.__dict__())
 
     def put(self, request, template_id):
         """Update template (creates new version)."""
+        version_number = request.data.get('version_number')
         content = request.data.get('content')
+
         if not content:
             raise BadRequestError("content is required")
+        if version_number is None:
+            raise BadRequestError("version_number is required")
+        
+        variables = [TemplateVariable.from_dict(v) for v in request.data.get('variables', [])]
 
         storage = FileStorageService()
         index_service = IndexService()
@@ -350,16 +352,13 @@ class TemplateDetailView(APIView):
         if not entry:
             raise ResourceNotFoundError(f"Template {template_id} not found")
 
-        slug = entry['slug']
+        # Get existing metadata
+        metadata = storage.load_metadata('template', template_id)
 
-        # Parse new content
-        metadata, body = parse_frontmatter(content)
-        metadata['id'] = template_id
-        metadata['type'] = 'template'
-        metadata['updated_at'] = datetime.utcnow().isoformat()
+        
 
         # Create new version
-        version_id = storage.create_version('template', template_id, slug, metadata, body)
+        version_id = storage.create_version(metadata, version_number, content, variables)
 
         # Update index
         index_service.add_or_update(
@@ -371,8 +370,7 @@ class TemplateDetailView(APIView):
 
         return Response({
             'id': template_id,
-            'version_id': version_id,
-            'updated_at': metadata['updated_at'],
+            'version_id': version_id
         })
 
     def delete(self, request, template_id):
@@ -385,10 +383,8 @@ class TemplateDetailView(APIView):
         if not entry:
             raise ResourceNotFoundError(f"Template {template_id} not found")
 
-        slug = entry['slug']
-
         # Delete from storage
-        storage.delete_item('template', template_id, slug)
+        storage.delete_item('template', template_id)
 
         # Remove from index
         index_service.remove(template_id)
@@ -411,14 +407,12 @@ class TemplateVersionsView(APIView):
         if not entry:
             raise ResourceNotFoundError(f"Template {template_id} not found")
 
-        slug = entry['slug']
-
         # Get versions
-        versions = storage.list_versions('template', template_id, slug)
+        versions = storage.list_versions('template', template_id)
 
         return Response({
             'template_id': template_id,
-            'versions': versions,
+            'versions': [v.__dict__() for v in versions],
             'count': len(versions),
         })
 
@@ -438,17 +432,29 @@ class TemplateVersionDetailView(APIView):
         if not entry:
             raise ResourceNotFoundError(f"Template {template_id} not found")
 
-        slug = entry['slug']
-
         # Read specific version
-        metadata, content = storage.read_version('template', template_id, slug, version_id)
+        version_data = storage.read_version('template', template_id, version_id)
 
         return Response({
             'template_id': template_id,
-            'version_id': version_id,
-            'metadata': metadata,
-            'content': content,
+            'frontmatter': version_data.__dict__(),
+            'content': version_data.content,
         })
+    
+    def delete(self, request, template_id, version_id):
+        """Delete a specific version of a template."""
+        storage = FileStorageService()
+        index_service = IndexService()
+
+        # Get from index to find slug
+        entry = index_service.get_by_id(template_id)
+        if not entry:
+            raise ResourceNotFoundError(f"Template {template_id} not found")
+
+        # Delete specific version
+        storage.delete_version('template', template_id, version_id)
+
+        return Response(status=status.HTTP_204_NO_CONTENT)
 
 
 # ============================================================================
@@ -458,13 +464,24 @@ class TemplateVersionDetailView(APIView):
 class ChatsListView(APIView):
     """
     GET /v1/chats - List all chats
-    POST /v1/chats - Create a new chat
+    POST /v1/chats - Create a new chat (with deduplication support)
     """
 
     def get(self, request):
         """List all chats."""
         storage = FileStorageService()
         chats = storage.list_all_chats()
+
+        # Apply filters if provided
+        provider = request.query_params.get('provider')
+        if provider:
+            chats = [c for c in chats if c.get('provider', '').lower() == provider.lower()]
+
+        # Add turn_count to each chat if not present
+        for chat in chats:
+            if 'turn_count' not in chat and 'messages' in chat:
+                turn_count = sum(1 for msg in chat['messages'] if msg.get('role') == 'user')
+                chat['turn_count'] = turn_count
 
         # Sort by updated_at descending
         chats.sort(key=lambda x: x.get('updated_at', ''), reverse=True)
@@ -478,23 +495,60 @@ class ChatsListView(APIView):
         })
 
     def post(self, request):
-        """Create a new chat."""
+        """Create a new chat (or update if provider + conversation_id exists)."""
         chat_data = request.data
 
         # Validate required fields
         if not chat_data.get('title'):
             raise ValidationError("title is required")
 
-        # Set timestamps
-        chat_data['created_at'] = chat_data.get('created_at') or datetime.utcnow().isoformat()
-        chat_data['updated_at'] = datetime.utcnow().isoformat()
+        storage = FileStorageService()
+
+        # Check for existing chat by provider + conversation_id (for browser extension deduplication)
+        if chat_data.get('provider') and chat_data.get('conversation_id'):
+            existing = storage.find_chat_by_conversation(
+                chat_data['provider'],
+                chat_data['conversation_id']
+            )
+
+            if existing:
+                # Update existing chat
+                chat_id = existing['id']
+                chat_data['id'] = chat_id
+                chat_data['created_at'] = existing.get('created_at')
+                chat_data['updated_at'] = datetime.datetime.now(datetime.timezone.utc).isoformat()
+                storage.update_chat(chat_id, chat_data)
+
+                # Update index
+                index_service = IndexService()
+                entry = index_service.get_by_id(chat_id)
+                if entry:
+                    metadata = {
+                        'id': chat_id,
+                        'title': chat_data.get('title', ''),
+                        'description': chat_data.get('description', ''),
+                        'labels': chat_data.get('tags', []),
+                        'author': 'system',
+                        'created_at': chat_data.get('created_at', ''),
+                        'updated_at': chat_data.get('updated_at', ''),
+                        'type': 'chat',
+                    }
+                    index_service.add_or_update(chat_id, metadata, entry['file_path'], 'latest')
+
+                return Response({
+                    'id': chat_id,
+                    'updated_at': chat_data['updated_at'],
+                    'message': 'Chat updated',
+                })
+
+        # Create new chat
+        chat_data['created_at'] = chat_data.get('created_at') or datetime.datetime.now(datetime.timezone.utc).isoformat()
+        chat_data['updated_at'] = datetime.datetime.now(datetime.timezone.utc).isoformat()
 
         # Ensure messages array exists
         if 'messages' not in chat_data:
             chat_data['messages'] = []
 
-        # Create chat
-        storage = FileStorageService()
         chat_id = storage.create_chat(chat_data)
 
         # Add to index
@@ -519,6 +573,7 @@ class ChatsListView(APIView):
         return Response({
             'id': chat_id,
             'created_at': chat_data['created_at'],
+            'message': 'Chat created',
         }, status=status.HTTP_201_CREATED)
 
 
@@ -533,6 +588,12 @@ class ChatDetailView(APIView):
         """Get chat details."""
         storage = FileStorageService()
         chat_data = storage.read_chat(chat_id)
+
+        # Calculate conversation turns if not already present
+        if 'turn_count' not in chat_data and 'messages' in chat_data:
+            # Count user messages as turn count (each user-assistant pair is 1 turn)
+            turn_count = sum(1 for msg in chat_data['messages'] if msg.get('role') == 'user')
+            chat_data['turn_count'] = turn_count
 
         return Response(chat_data)
 

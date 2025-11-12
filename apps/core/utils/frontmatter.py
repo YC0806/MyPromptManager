@@ -14,7 +14,7 @@ def parse_frontmatter(content: str) -> Tuple[Dict, str]:
     Supports both YAML and JSON formats between --- delimiters.
 
     Returns:
-        Tuple of (metadata dict, markdown body)
+        Tuple of (frontmatter_dict dict, body)
     """
     # Match front matter between --- delimiters
     pattern = r'^---\s*\n(.*?)\n---\s*\n(.*)$'
@@ -24,13 +24,13 @@ def parse_frontmatter(content: str) -> Tuple[Dict, str]:
         return {}, content
 
     frontmatter_content = match.group(1).strip()
-    markdown_body = match.group(2)
+    body = match.group(2)
 
     # Try to parse as JSON first (if it starts with {)
     if frontmatter_content.startswith('{'):
         try:
-            metadata = json.loads(frontmatter_content)
-            return metadata, markdown_body
+            frontmatter_dict = json.loads(frontmatter_content)
+            return frontmatter_dict, body
         except json.JSONDecodeError:
             pass  # Fall back to YAML
 
@@ -40,11 +40,11 @@ def parse_frontmatter(content: str) -> Tuple[Dict, str]:
     yaml.default_flow_style = False
 
     try:
-        metadata = yaml.load(frontmatter_content) or {}
+        frontmatter_dict = yaml.load(frontmatter_content) or {}
     except Exception:
-        metadata = {}
+        frontmatter_dict = {}
 
-    return metadata, markdown_body
+    return frontmatter_dict, body
 
 
 def serialize_frontmatter(metadata: Dict, body: str) -> str:
@@ -87,8 +87,9 @@ def extract_metadata_fields(metadata: Dict) -> Dict:
         - created_at
         - updated_at
         - author
+        - variables (for templates only): list of {name, description, default}
     """
-    return {
+    fields = {
         'id': metadata.get('id'),
         'title': metadata.get('title', ''),
         'description': metadata.get('description', ''),
@@ -99,3 +100,9 @@ def extract_metadata_fields(metadata: Dict) -> Dict:
         'updated_at': metadata.get('updated_at'),
         'author': metadata.get('author', ''),
     }
+
+    # Add variables field for templates
+    if metadata.get('type') == 'template' and 'variables' in metadata:
+        fields['variables'] = metadata.get('variables', [])
+
+    return fields
