@@ -16,6 +16,13 @@
         .catch(error => sendResponse({ success: false, error: error.message }));
       return true; // Will respond asynchronously
     }
+
+    if (request.action === 'fillInput') {
+      fillInputField(request.content)
+        .then(() => sendResponse({ success: true }))
+        .catch(error => sendResponse({ success: false, error: error.message }));
+      return true; // Will respond asynchronously
+    }
   });
 
   // Extract conversation from the page
@@ -207,6 +214,60 @@
     document.addEventListener('DOMContentLoaded', autoExtract);
   } else {
     autoExtract();
+  }
+
+  // Fill input field with content
+  async function fillInputField(content) {
+    try {
+      // Find the main input textarea
+      const inputSelectors = [
+        'textarea[placeholder*="输入"]',
+        'textarea[placeholder*="问我"]',
+        'textarea',
+        '[contenteditable="true"]',
+      ];
+
+      let inputElement = null;
+      for (const selector of inputSelectors) {
+        inputElement = document.querySelector(selector);
+        if (inputElement) break;
+      }
+
+      if (!inputElement) {
+        throw new Error('无法找到输入框');
+      }
+
+      // Check if it's a contenteditable div or textarea
+      const isContentEditable = inputElement.contentEditable === 'true';
+
+      if (isContentEditable) {
+        inputElement.textContent = content;
+        inputElement.innerText = content;
+      } else {
+        inputElement.value = content;
+      }
+
+      // Trigger input events
+      const inputEvent = new Event('input', { bubbles: true, cancelable: true });
+      const changeEvent = new Event('change', { bubbles: true, cancelable: true });
+      inputElement.dispatchEvent(inputEvent);
+      inputElement.dispatchEvent(changeEvent);
+
+      // Focus the input
+      inputElement.focus();
+
+      // Adjust height if needed
+      if (!isContentEditable && inputElement.style) {
+        inputElement.style.height = 'auto';
+        inputElement.style.height = inputElement.scrollHeight + 'px';
+      }
+
+      console.log('Content filled successfully');
+      return true;
+    } catch (error) {
+      console.error('Error filling input:', error);
+      throw error;
+    }
   }
 
   console.log('MyPromptManager: DeepSeek content script loaded');

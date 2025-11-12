@@ -16,6 +16,13 @@
         .catch(error => sendResponse({ success: false, error: error.message }));
       return true; // Will respond asynchronously
     }
+
+    if (request.action === 'fillInput') {
+      fillInputField(request.content)
+        .then(() => sendResponse({ success: true }))
+        .catch(error => sendResponse({ success: false, error: error.message }));
+      return true; // Will respond asynchronously
+    }
   });
 
   // Extract conversation from the page
@@ -214,6 +221,67 @@
     document.addEventListener('DOMContentLoaded', autoExtract);
   } else {
     autoExtract();
+  }
+
+  // Fill input field with content
+  async function fillInputField(content) {
+    try {
+      // Find the main input element (Gemini uses contenteditable divs and textareas)
+      const inputSelectors = [
+        '[contenteditable="true"]',
+        'textarea[placeholder]',
+        'textarea',
+      ];
+
+      let inputElement = null;
+      for (const selector of inputSelectors) {
+        const elements = document.querySelectorAll(selector);
+        // Find the visible input element
+        for (const el of elements) {
+          const rect = el.getBoundingClientRect();
+          if (rect.height > 0 && rect.width > 0) {
+            inputElement = el;
+            break;
+          }
+        }
+        if (inputElement) break;
+      }
+
+      if (!inputElement) {
+        throw new Error('无法找到输入框');
+      }
+
+      // Check if it's a contenteditable div or textarea
+      const isContentEditable = inputElement.contentEditable === 'true';
+
+      if (isContentEditable) {
+        inputElement.textContent = content;
+        inputElement.innerText = content;
+      } else {
+        inputElement.value = content;
+      }
+
+      // Trigger input events
+      const inputEvent = new Event('input', { bubbles: true, cancelable: true });
+      const changeEvent = new Event('change', { bubbles: true, cancelable: true });
+      inputElement.dispatchEvent(inputEvent);
+      inputElement.dispatchEvent(changeEvent);
+
+      // Focus the input
+      inputElement.focus();
+
+      // Adjust height if needed
+      if (!isContentEditable && inputElement.style) {
+        inputElement.style.height = 'auto';
+        inputElement.style.height = inputElement.scrollHeight + 'px';
+      }
+
+      console.log('Content filled successfully');
+      return true;
+    } catch (error) {
+      console.error('Error filling input:', error);
+      throw error;
+    }
   }
 
   console.log('MyPromptManager: Gemini content script loaded');

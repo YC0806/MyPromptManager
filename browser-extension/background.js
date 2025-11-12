@@ -4,7 +4,7 @@
 
 // Default configuration
 const DEFAULT_CONFIG = {
-  apiUrl: 'http://localhost:8000/api/v1',
+  apiUrl: 'http://localhost:8000/v1',
   autoSync: true,
   syncInterval: 5, // minutes
 };
@@ -75,7 +75,8 @@ async function handleConversationExtraction(conversationData) {
 // Sync conversation to backend API
 async function syncToBackend(conversationData, apiUrl) {
   try {
-    const response = await fetch(`${apiUrl}/ai-histories`, {
+    const now = new Date().toISOString();
+    const response = await fetch(`${apiUrl}/chats`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -84,14 +85,19 @@ async function syncToBackend(conversationData, apiUrl) {
         provider: conversationData.provider,
         conversation_id: conversationData.conversationId,
         title: conversationData.title,
-        messages: conversationData.messages,
-        metadata: conversationData.metadata,
-        extracted_at: new Date().toISOString(),
+        messages: conversationData.messages || [],
+        metadata: {
+          ...(conversationData.metadata || {}),
+          extracted_at: now,
+        },
+        created_at: now,
+        updated_at: now,
       }),
     });
 
     if (!response.ok) {
-      throw new Error(`API request failed: ${response.status}`);
+      const errorText = await response.text();
+      throw new Error(`API request failed: ${response.status} - ${errorText}`);
     }
 
     const result = await response.json();

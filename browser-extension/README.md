@@ -4,11 +4,21 @@
 
 ## 功能特性
 
+### 对话历史同步
+
 - ✅ **多平台支持**：支持 ChatGPT、DeepSeek、Claude、Gemini
 - ✅ **自动提取**：自动检测并提取当前页面的对话历史
 - ✅ **智能同步**：自动同步到 MyPromptManager 后端
 - ✅ **去重处理**：相同对话 ID 的历史记录会自动更新而不是重复创建
 - ✅ **离线存储**：先保存到本地，再同步到服务器
+
+### Prompt & Template 库（NEW）
+
+- ✅ **浏览管理**：在插件中直接浏览和搜索你的 Prompt 和 Template 库
+- ✅ **快速搜索**：实时搜索标题和描述内容
+- ✅ **类型筛选**：可按 Prompt 或 Template 类型筛选
+- ✅ **一键复制**：快速复制内容到剪贴板
+- ✅ **一键填入**：直接将内容填入当前 AI 对话框，支持所有平台
 - ✅ **可配置**：可自定义 API 地址、自动同步开关等
 
 ## 安装方法
@@ -35,10 +45,11 @@ Firefox 版本需要将 manifest.json 修改为 manifest v2 格式。暂不支�
 首次使用需要配置 API 地址：
 
 1. 点击浏览器工具栏中的插件图标
-2. 点击"设置"按钮
-3. 输入 MyPromptManager API 地址（默认：`http://localhost:8000/api/v1`）
-4. 根据需要开启/关闭"自动同步"
-5. 点击"保存设置"
+2. 切换到"对话同步"标签页
+3. 点击"设置"按钮
+4. 输入 MyPromptManager API 地址（默认：`http://localhost:8000/v1`）
+5. 根据需要开启/关闭"自动同步"
+6. 点击"保存设置"
 
 ### 2. 提取对话历史
 
@@ -46,21 +57,45 @@ Firefox 版本需要将 manifest.json 修改为 manifest v2 格式。暂不支�
 
 1. 访问任何支持的 AI 提供商网站并打开一个对话
 2. 点击浏览器工具栏中的插件图标
-3. 点击"提取当前对话"按钮
+3. 在"对话同步"标签页中，点击"提取当前对话"按钮
 4. 等待提取完成，会显示成功提示
 
 #### 方法二：自动提取
 
 如果开启了"自动同步"，插件会在页面加载后自动提取对话历史（延迟 3 秒）。
 
-### 3. 查看同步状态
+### 3. 使用 Prompt & Template 库（NEW）
 
-点击插件图标可以查看：
+#### 浏览和搜索
+
+1. 点击浏览器工具栏中的插件图标
+2. 切换到"Prompt库"标签页
+3. 浏览你的 Prompt 和 Template 列表
+4. 使用搜索框快速查找内容
+5. 使用筛选按钮切换显示全部/仅 Prompt/仅 Template
+
+#### 复制内容
+
+1. 在列表中点击任意 Prompt 或 Template 卡片
+2. 查看完整内容
+3. 点击"复制"按钮将内容复制到剪贴板
+
+#### 一键填入对话框
+
+1. 访问任何支持的 AI 提供商网站（ChatGPT、DeepSeek、Claude、Gemini）
+2. 打开插件，切换到"Prompt库"标签页
+3. 点击任意 Prompt 或 Template 卡片
+4. 点击"填入对话框"按钮
+5. 内容会自动填入当前页面的输入框，无需手动复制粘贴
+
+### 4. 查看同步状态
+
+点击插件图标，在"对话同步"标签页可以查看：
 - 当前检测到的 AI 提供商
 - 自动同步状态
 - 已保存的对话数量
 
-### 4. 在网页中查看
+### 5. 在网页中查看
 
 提取的对话历史会自动同步到 MyPromptManager 系统：
 
@@ -142,10 +177,12 @@ Firefox 版本需要将 manifest.json 修改为 manifest v2 格式。暂不支�
 ## 技术实现
 
 - **Manifest V3**：使用最新的浏览器扩展 API
-- **Content Scripts**：针对每个 AI 提供商的定制化提取逻辑
+- **Content Scripts**：针对每个 AI 提供商的定制化提取和填充逻辑
 - **Background Service Worker**：处理数据同步和存储
 - **Chrome Storage API**：本地数据持久化
 - **REST API**：与 MyPromptManager 后端通信
+- **动态 DOM 操作**：智能识别和填充各平台的输入框
+- **双向通信**：Popup、Content Script、Background 三者协同工作
 
 ## 开发说明
 
@@ -153,20 +190,23 @@ Firefox 版本需要将 manifest.json 修改为 manifest v2 格式。暂不支�
 
 ```
 browser-extension/
-├── manifest.json           # 插件配置文件
-├── background.js          # 后台服务脚本
-├── popup.html            # 弹出窗口 HTML
-├── popup.js              # 弹出窗口脚本
-├── content-scripts/      # 内容脚本目录
-│   ├── chatgpt.js       # ChatGPT 提取器
-│   ├── deepseek.js      # DeepSeek 提取器
-│   ├── claude.js        # Claude 提取器
-│   └── gemini.js        # Gemini 提取器
-└── icons/               # 图标目录（需要添加）
-    ├── icon16.png
-    ├── icon32.png
-    ├── icon48.png
-    └── icon128.png
+├── manifest.json                    # 插件配置文件
+├── background.js                    # 后台服务脚本
+├── popup.html                      # 弹出窗口 HTML（双标签页界面）
+├── popup.js                        # 弹出窗口脚本（包含库浏览功能）
+├── content-scripts/                # 内容脚本目录
+│   ├── chatgpt.js                 # ChatGPT 提取器 + 填充器
+│   ├── deepseek.js                # DeepSeek 提取器 + 填充器
+│   ├── claude.js                  # Claude 提取器 + 填充器
+│   ├── gemini.js                  # Gemini 提取器 + 填充器
+│   └── fill-input-utils.js        # 通用填充工具函数
+├── icons/                          # 图标目录
+│   ├── icon16.png
+│   ├── icon32.png
+│   ├── icon48.png
+│   └── icon128.png
+├── test_api.sh                     # API 测试脚本
+└── README.md                       # 本文档
 ```
 
 ### 添加新的 AI 提供商
@@ -179,6 +219,23 @@ browser-extension/
    - 提取消息列表（用户和助手的对话）
 4. 在 `popup.js` 的 `detectProvider()` 函数中添加检测逻辑
 
+### 测试 API 集成
+
+使用提供的测试脚本验证插件与后端 API 的集成：
+
+```bash
+cd browser-extension
+./test_api.sh
+```
+
+测试脚本会自动验证：
+- 健康检查端点
+- 创建 AI 历史记录
+- 获取 AI 历史列表
+- 更新 AI 历史记录
+- 去重处理（相同 conversation_id 自动更新）
+- 按提供商过滤
+
 ### 调试
 
 1. 在浏览器中打开插件管理页面
@@ -187,6 +244,19 @@ browser-extension/
 4. 查看 Console 标签页的日志输出
 
 ## 更新日志
+
+### v1.1.0 (2025-11)
+- 🎉 **新功能：Prompt & Template 库浏览**
+  - ✅ 双标签页界面设计（对话同步 + Prompt库）
+  - ✅ 浏览和搜索 Prompt 和 Template
+  - ✅ 实时搜索和类型筛选
+  - ✅ 一键复制到剪贴板
+  - ✅ 一键填入 AI 对话框（支持所有平台）
+- 🔧 **增强功能**
+  - ✅ Content Scripts 新增输入框填充功能
+  - ✅ 智能识别各平台输入框（textarea 和 contenteditable）
+  - ✅ 自动触发输入事件确保识别
+  - ✅ 优化 UI/UX 设计，更现代化的界面
 
 ### v1.0.0 (2024)
 - ✅ 初始版本发布

@@ -16,6 +16,13 @@
         .catch(error => sendResponse({ success: false, error: error.message }));
       return true; // Will respond asynchronously
     }
+
+    if (request.action === 'fillInput') {
+      fillInputField(request.content)
+        .then(() => sendResponse({ success: true }))
+        .catch(error => sendResponse({ success: false, error: error.message }));
+      return true; // Will respond asynchronously
+    }
   });
 
   // Extract conversation from the page
@@ -147,6 +154,54 @@
       }
     } catch (error) {
       console.error('Error in auto-extract:', error);
+    }
+  }
+
+  // Fill input field with content
+  async function fillInputField(content) {
+    try {
+      // Find the main input textarea
+      const inputSelectors = [
+        '#prompt-textarea',
+        'textarea[placeholder*="Message"]',
+        'textarea[data-id="root"]',
+        'textarea',
+      ];
+
+      let inputElement = null;
+      for (const selector of inputSelectors) {
+        inputElement = document.querySelector(selector);
+        if (inputElement) break;
+      }
+
+      if (!inputElement) {
+        throw new Error('无法找到输入框');
+      }
+
+      // Set the value
+      inputElement.value = content;
+      inputElement.textContent = content;
+
+      // Trigger input events to make ChatGPT recognize the change
+      const inputEvent = new Event('input', { bubbles: true, cancelable: true });
+      const changeEvent = new Event('change', { bubbles: true, cancelable: true });
+      inputElement.dispatchEvent(inputEvent);
+      inputElement.dispatchEvent(changeEvent);
+
+      // Focus the input
+      inputElement.focus();
+
+      // Adjust height if needed (for auto-expanding textareas)
+      if (inputElement.style) {
+        inputElement.style.height = 'auto';
+        inputElement.style.height = inputElement.scrollHeight + 'px';
+      }
+
+      console.log('Content filled successfully');
+      return true;
+    } catch (error) {
+      console.error('Error filling input:', error);
+      throw error;
     }
   }
 
