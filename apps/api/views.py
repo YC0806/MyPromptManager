@@ -8,8 +8,6 @@ from django.conf import settings
 import datetime
 
 from apps.core.services.file_storage_service import FileStorageService
-from apps.core.services.index_service import IndexService
-from apps.core.utils.frontmatter import parse_frontmatter, serialize_frontmatter
 from apps.core.exceptions import ResourceNotFoundError, ValidationError, BadRequestError
 from apps.core.domain.metadata import Metadata
 from apps.core.domain.version import TemplateVariable
@@ -78,15 +76,6 @@ class PromptsListView(APIView):
         storage = FileStorageService()
         item_id, version_id = storage.create_item('prompt', metadata, content, None)
 
-        # Add to index
-        index_service = IndexService()
-        index_service.add_or_update(
-            item_id,
-            metadata.__dict__(),
-            f"prompts/prompt-{item_id}/versions/pv-{item_id}_{version_id}.md",
-            version_id
-        )
-
         return Response({
             'id': item_id,
             'version_id': version_id
@@ -103,12 +92,6 @@ class PromptDetailView(APIView):
     def get(self, request, prompt_id):
         """Get prompt details (HEAD version)."""
         storage = FileStorageService()
-        index_service = IndexService()
-
-        # Get from index to find slug
-        entry = index_service.get_by_id(prompt_id)
-        if not entry:
-            raise ResourceNotFoundError(f"Prompt {prompt_id} not found")
 
         metadata = storage.load_metadata('prompt', prompt_id)
 
@@ -124,12 +107,6 @@ class PromptDetailView(APIView):
             raise BadRequestError("version_number is required")
 
         storage = FileStorageService()
-        index_service = IndexService()
-
-        # Get existing item
-        entry = index_service.get_by_id(prompt_id)
-        if not entry:
-            raise ResourceNotFoundError(f"Prompt {prompt_id} not found")
 
         # Get existing metadata
         metadata = storage.load_metadata('prompt', prompt_id)
@@ -137,13 +114,6 @@ class PromptDetailView(APIView):
         # Create new version
         version_id = storage.create_version(metadata, version_number, content, None)
 
-        # Update index
-        index_service.add_or_update(
-            prompt_id,
-            metadata,
-            entry['file_path'],
-            version_id
-        )
 
         return Response({
             'id': prompt_id,
@@ -153,18 +123,9 @@ class PromptDetailView(APIView):
     def delete(self, request, prompt_id):
         """Delete prompt."""
         storage = FileStorageService()
-        index_service = IndexService()
-
-        # Get entry to find slug
-        entry = index_service.get_by_id(prompt_id)
-        if not entry:
-            raise ResourceNotFoundError(f"Prompt {prompt_id} not found")
 
         # Delete from storage
         storage.delete_item('prompt', prompt_id)
-
-        # Remove from index
-        index_service.remove(prompt_id)
 
         return Response(status=status.HTTP_204_NO_CONTENT)
 
@@ -177,12 +138,6 @@ class PromptVersionsView(APIView):
     def get(self, request, prompt_id):
         """List all versions of a prompt."""
         storage = FileStorageService()
-        index_service = IndexService()
-
-        # Get from index to find slug
-        entry = index_service.get_by_id(prompt_id)
-        if not entry:
-            raise ResourceNotFoundError(f"Prompt {prompt_id} not found")
 
         # Get versions
         versions = storage.list_versions('prompt', prompt_id)
@@ -203,12 +158,6 @@ class PromptVersionDetailView(APIView):
     def get(self, request, prompt_id, version_id):
         """Get a specific version of a prompt."""
         storage = FileStorageService()
-        index_service = IndexService()
-
-        # Get from index to find slug
-        entry = index_service.get_by_id(prompt_id)
-        if not entry:
-            raise ResourceNotFoundError(f"Prompt {prompt_id} not found")
 
         # Read specific version
         version_data = storage.read_version('prompt', prompt_id, version_id)
@@ -222,12 +171,6 @@ class PromptVersionDetailView(APIView):
     def delete(self, request, prompt_id, version_id):
         """Delete a specific version of a prompt."""
         storage = FileStorageService()
-        index_service = IndexService()
-
-        # Get from index to find slug
-        entry = index_service.get_by_id(prompt_id)
-        if not entry:
-            raise ResourceNotFoundError(f"Prompt {prompt_id} not found")
 
         # Delete specific version
         storage.delete_version('prompt', prompt_id, version_id)
@@ -296,14 +239,6 @@ class TemplatesListView(APIView):
         storage = FileStorageService()
         item_id, version_id = storage.create_item('template', metadata, content, variables)
 
-        index_service = IndexService()
-        index_service.add_or_update(
-            item_id,
-            metadata.__dict__(),
-            f"templates/template-{item_id}/versions/tv-{item_id}_{version_id}.md",
-            version_id
-        )
-
         return Response({
             'id': item_id,
             'version_id': version_id,
@@ -320,12 +255,6 @@ class TemplateDetailView(APIView):
     def get(self, request, template_id):
         """Get template details (HEAD version)."""
         storage = FileStorageService()
-        index_service = IndexService()
-
-        # Get from index to find slug
-        entry = index_service.get_by_id(template_id)
-        if not entry:
-            raise ResourceNotFoundError(f"Template {template_id} not found")
 
         # Read HEAD version
         metadata = storage.load_metadata('template', template_id)
@@ -345,12 +274,6 @@ class TemplateDetailView(APIView):
         variables = [TemplateVariable.from_dict(v) for v in request.data.get('variables', [])]
 
         storage = FileStorageService()
-        index_service = IndexService()
-
-        # Get existing item
-        entry = index_service.get_by_id(template_id)
-        if not entry:
-            raise ResourceNotFoundError(f"Template {template_id} not found")
 
         # Get existing metadata
         metadata = storage.load_metadata('template', template_id)
@@ -360,14 +283,6 @@ class TemplateDetailView(APIView):
         # Create new version
         version_id = storage.create_version(metadata, version_number, content, variables)
 
-        # Update index
-        index_service.add_or_update(
-            template_id,
-            metadata,
-            entry['file_path'],
-            version_id
-        )
-
         return Response({
             'id': template_id,
             'version_id': version_id
@@ -376,18 +291,8 @@ class TemplateDetailView(APIView):
     def delete(self, request, template_id):
         """Delete template."""
         storage = FileStorageService()
-        index_service = IndexService()
-
-        # Get entry to find slug
-        entry = index_service.get_by_id(template_id)
-        if not entry:
-            raise ResourceNotFoundError(f"Template {template_id} not found")
-
         # Delete from storage
         storage.delete_item('template', template_id)
-
-        # Remove from index
-        index_service.remove(template_id)
 
         return Response(status=status.HTTP_204_NO_CONTENT)
 
@@ -400,12 +305,6 @@ class TemplateVersionsView(APIView):
     def get(self, request, template_id):
         """List all versions of a template."""
         storage = FileStorageService()
-        index_service = IndexService()
-
-        # Get from index to find slug
-        entry = index_service.get_by_id(template_id)
-        if not entry:
-            raise ResourceNotFoundError(f"Template {template_id} not found")
 
         # Get versions
         versions = storage.list_versions('template', template_id)
@@ -425,12 +324,6 @@ class TemplateVersionDetailView(APIView):
     def get(self, request, template_id, version_id):
         """Get a specific version of a template."""
         storage = FileStorageService()
-        index_service = IndexService()
-
-        # Get from index to find slug
-        entry = index_service.get_by_id(template_id)
-        if not entry:
-            raise ResourceNotFoundError(f"Template {template_id} not found")
 
         # Read specific version
         version_data = storage.read_version('template', template_id, version_id)
@@ -444,12 +337,6 @@ class TemplateVersionDetailView(APIView):
     def delete(self, request, template_id, version_id):
         """Delete a specific version of a template."""
         storage = FileStorageService()
-        index_service = IndexService()
-
-        # Get from index to find slug
-        entry = index_service.get_by_id(template_id)
-        if not entry:
-            raise ResourceNotFoundError(f"Template {template_id} not found")
 
         # Delete specific version
         storage.delete_version('template', template_id, version_id)
@@ -519,22 +406,6 @@ class ChatsListView(APIView):
                 chat_data['updated_at'] = datetime.datetime.now(datetime.timezone.utc).isoformat()
                 storage.update_chat(chat_id, chat_data)
 
-                # Update index
-                index_service = IndexService()
-                entry = index_service.get_by_id(chat_id)
-                if entry:
-                    metadata = {
-                        'id': chat_id,
-                        'title': chat_data.get('title', ''),
-                        'description': chat_data.get('description', ''),
-                        'labels': chat_data.get('tags', []),
-                        'author': 'system',
-                        'created_at': chat_data.get('created_at', ''),
-                        'updated_at': chat_data.get('updated_at', ''),
-                        'type': 'chat',
-                    }
-                    index_service.add_or_update(chat_id, metadata, entry['file_path'], 'latest')
-
                 return Response({
                     'id': chat_id,
                     'updated_at': chat_data['updated_at'],
@@ -551,8 +422,6 @@ class ChatsListView(APIView):
 
         chat_id = storage.create_chat(chat_data)
 
-        # Add to index
-        index_service = IndexService()
         metadata = {
             'id': chat_id,
             'title': chat_data.get('title', ''),
@@ -563,12 +432,6 @@ class ChatsListView(APIView):
             'type': 'chat',
         }
         title_slug = chat_data.get('title', chat_id).lower().replace(' ', '-')[:50]
-        index_service.add_or_update(
-            chat_id,
-            metadata,
-            f"chats/chat_{title_slug}-{chat_id}.json",
-            'latest'
-        )
 
         return Response({
             'id': chat_id,
@@ -605,8 +468,6 @@ class ChatDetailView(APIView):
         storage = FileStorageService()
         storage.update_chat(chat_id, chat_data)
 
-        # Update index
-        index_service = IndexService()
         metadata = {
             'id': chat_id,
             'title': chat_data.get('title', ''),
@@ -617,10 +478,6 @@ class ChatDetailView(APIView):
             'updated_at': chat_data.get('updated_at', ''),
             'type': 'chat',
         }
-        # Get file path from index
-        entry = index_service.get_by_id(chat_id)
-        if entry:
-            index_service.add_or_update(chat_id, metadata, entry['file_path'], 'latest')
 
         return Response({
             'id': chat_id,
@@ -631,10 +488,6 @@ class ChatDetailView(APIView):
         """Delete chat."""
         storage = FileStorageService()
         storage.delete_chat(chat_id)
-
-        # Remove from index
-        index_service = IndexService()
-        index_service.remove(chat_id)
 
         return Response(status=status.HTTP_204_NO_CONTENT)
 
@@ -651,90 +504,13 @@ class SearchView(APIView):
     def get(self, request):
         type_filter = request.query_params.get('type')
         labels = request.query_params.getlist('labels')
-        slug = request.query_params.get('slug')
         author = request.query_params.get('author')
         limit = int(request.query_params.get('limit', 50))
         cursor = request.query_params.get('cursor')
 
-        index_service = IndexService()
+        # Perform search
 
-        results = index_service.search(
-            type_filter=type_filter,
-            labels=labels if labels else None,
-            slug=slug,
-            author=author,
-            limit=limit,
-            cursor=cursor
-        )
-
-        return Response(results)
-
-
-class IndexStatusView(APIView):
-    """
-    GET /v1/index/status - Get index status
-    """
-
-    def get(self, request):
-        index_service = IndexService()
-        status_info = index_service.get_status()
-
-        return Response(status_info)
-
-
-class IndexRebuildView(APIView):
-    """
-    POST /v1/index/rebuild - Rebuild index from file storage
-    """
-
-    def post(self, request):
-        index_service = IndexService()
-        storage = FileStorageService()
-
-        # Rebuild index from file storage
-        stats = index_service.rebuild(storage)
-
-        return Response({
-            'status': 'completed',
-            'stats': stats,
-        })
-
-
-class HealthView(APIView):
-    """
-    GET /v1/health - Health check
-    """
-    permission_classes = []  # Public endpoint
-
-    def get(self, request):
-        # Check storage
-        try:
-            storage = FileStorageService()
-            storage_healthy = True
-        except Exception as e:
-            storage_healthy = False
-
-        # Check index
-        try:
-            index_service = IndexService()
-            status_info = index_service.get_status()
-            index_healthy = True
-        except Exception as e:
-            index_healthy = False
-            status_info = {}
-
-        overall_healthy = storage_healthy and index_healthy
-
-        return Response({
-            'status': 'healthy' if overall_healthy else 'unhealthy',
-            'storage': {
-                'healthy': storage_healthy,
-            },
-            'index': {
-                'healthy': index_healthy,
-                **status_info
-            }
-        }, status=status.HTTP_200_OK if overall_healthy else status.HTTP_503_SERVICE_UNAVAILABLE)
+        return Response([])
 
 
 # ============================================================================

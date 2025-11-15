@@ -47,32 +47,6 @@ def parse_frontmatter(content: str) -> Tuple[Dict, str]:
     return frontmatter_dict, body
 
 
-def serialize_frontmatter(metadata: Dict, body: str) -> str:
-    """
-    Serialize metadata and body into Markdown with YAML Front Matter.
-
-    Args:
-        metadata: Dictionary of metadata
-        body: Markdown body content
-
-    Returns:
-        Complete Markdown string with front matter
-    """
-    yaml = YAML()
-    yaml.preserve_quotes = True
-    yaml.default_flow_style = False
-
-    if not metadata:
-        return body
-
-    import io
-    stream = io.StringIO()
-    yaml.dump(metadata, stream)
-    yaml_str = stream.getvalue()
-
-    return f"---\n{yaml_str}---\n{body}"
-
-
 def extract_metadata_fields(metadata: Dict) -> Dict:
     """
     Extract standard fields from metadata.
