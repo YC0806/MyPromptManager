@@ -37,7 +37,7 @@ python manage.py runserver 0.0.0.0:8000
 - 索引文件路径：`<STORAGE_ROOT>/.promptmeta/index.json`（索引服务存在，但 `/v1/search` 暂未实现实际搜索逻辑）。
 
 ## API 文档
-- 详见 `doc/API_REFERENCE.md`（基于当前后端代码编写）。
+- 详见同目录下的 [`API_REFERENCE.md`](./API_REFERENCE.md)，内容与 `apps/api/views.py` 保持同步并以实际响应为准。
 - 浏览器插件侧的调用示例可参考 `browser-extension/API_INTEGRATION.md`（其中包含的 `/v1/health` 等端点目前未在后端实现，按需取用）。
 
 ## 自检与辅助脚本

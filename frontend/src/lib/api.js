@@ -38,7 +38,7 @@ export const promptsAPI = {
   /**
    * List all prompts
    * @param {Object} params - Query parameters (labels, limit)
-   * @returns {Promise<{prompts: Array, count: number, total: number}>}
+   * @returns {Promise<{items: Array, count: number, total: number}>}
    */
   list: async (params = {}) => {
     const query = new URLSearchParams();
@@ -54,9 +54,9 @@ export const promptsAPI = {
   },
 
   /**
-   * Get prompt by ID (HEAD version)
+   * Get prompt by ID (HEAD version metadata)
    * @param {string} id - Prompt ID
-   * @returns {Promise<{id: string, title: string, type: string, labels: list, description: string, updated_at: string, created_at: string, author: string}>}
+   * @returns {Promise<{id: string, title: string, type: string, labels: Array, description: string, updated_at: string, created_at: string, author: string}>}
    */
   get: async (id) => {
     return apiFetch(`${API_BASE}/prompts/${id}`);
@@ -66,9 +66,9 @@ export const promptsAPI = {
    * Create a new prompt
    * @param {string} title - Prompt title
    * @param {string} content - Prompt content
-   * @param {list} labels
-   * @param {string} description
-   * @returns {Promise<{id: string, version_id: string, created_at: string}>}
+   * @param {Array} labels - Labels (optional, default: [])
+   * @param {string} description - Description (optional, default: '')
+   * @returns {Promise<{success: boolean, id: string, version_id: string}>}
    */
   create: async (title, content, labels, description) => {
     return apiFetch(`${API_BASE}/prompts`, {
@@ -78,12 +78,12 @@ export const promptsAPI = {
   },
 
   /**
-   * Update a prompt
+   * Update a prompt (metadata only, not content)
    * @param {string} id - Prompt ID
    * @param {string} title - Prompt Title
-   * @param {list} labels
-   * @param {string} description
-   * @returns {Promise<{id: string, version_id: string, updated_at: string}>}
+   * @param {Array} labels - Labels (optional)
+   * @param {string} description - Description (optional)
+   * @returns {Promise<{success: boolean, id: string}>}
    */
   update: async (id, title, labels, description) => {
     return apiFetch(`${API_BASE}/prompts/${id}`, {
@@ -95,7 +95,7 @@ export const promptsAPI = {
   /**
    * Delete a prompt
    * @param {string} id - Prompt ID
-   * @returns {Promise<null>}
+   * @returns {Promise<{success: boolean, id: string}>}
    */
   delete: async (id) => {
     return apiFetch(`${API_BASE}/prompts/${id}`, {
@@ -113,13 +113,13 @@ export const promptsAPI = {
   },
 
   /**
-   * Get a specific version of a prompt
+   * Create a new version of a prompt
    * @param {string} id - Prompt ID
    * @param {string} version_number - Version Number
    * @param {string} content - Version Content
    * @returns {Promise<{id: string, version_id: string}>}
    */
-  createVersions: async (id, version_number, content) => {
+  createVersion: async (id, version_number, content) => {
       return apiFetch(`${API_BASE}/prompts/${id}/versions`, {
           method: 'POST',
           body: JSON.stringify({version_number, content}),
@@ -130,7 +130,7 @@ export const promptsAPI = {
    * Get a specific version of a prompt
    * @param {string} id - Prompt ID
    * @param {string} versionId - Version ID
-   * @returns {Promise<{prompt_id: string, version_id: string, metadata: Object, content: string}>}
+   * @returns {Promise<{prompt_id: string, id: string, version_number: string, created_at: string, author: string, content: string}>}
    */
   getVersion: async (id, versionId) => {
     return apiFetch(`${API_BASE}/prompts/${id}/versions/${versionId}`);
@@ -147,7 +147,7 @@ export const templatesAPI = {
   /**
    * List all templates
    * @param {Object} params - Query parameters (labels, limit)
-   * @returns {Promise<{templates: Array, count: number, total: number}>}
+   * @returns {Promise<{items: Array, count: number, total: number}>}
    */
   list: async (params = {}) => {
     const query = new URLSearchParams();
@@ -163,9 +163,9 @@ export const templatesAPI = {
   },
 
   /**
-   * Get template by ID (HEAD version)
+   * Get template by ID (HEAD version metadata)
    * @param {string} id - Template ID
-   * @returns {Promise<{id: string, title: string, type: string, labels: list, description: string, updated_at: string, created_at: string, author: string}>}
+   * @returns {Promise<{id: string, title: string, type: string, labels: Array, description: string, updated_at: string, created_at: string, author: string}>}
    */
   get: async (id) => {
     return apiFetch(`${API_BASE}/templates/${id}`);
@@ -175,10 +175,10 @@ export const templatesAPI = {
    * Create a new template
    * @param {string} title - Template title
    * @param {string} content - Template content
-   * @param {list} labels
-   * @param {string} description
-   * @param {list} variables
-   * @returns {Promise<{id: string, version_id: string, created_at: string}>}
+   * @param {Array} labels - Labels (optional, default: [])
+   * @param {string} description - Description (optional, default: '')
+   * @param {Array} variables - Variables (optional, format: [{name, type, description, default}])
+   * @returns {Promise<{id: string, version_id: string}>}
    */
   create: async (title, content, labels, description, variables) => {
     return apiFetch(`${API_BASE}/templates`, {
@@ -188,12 +188,12 @@ export const templatesAPI = {
   },
 
   /**
-   * Update a template
+   * Update a template (metadata only, not content)
    * @param {string} id - Template ID
    * @param {string} title - Template Title
-   * @param {list} labels
-   * @param {string} description
-   * @returns {Promise<{id: string, version_id: string, updated_at: string}>}
+   * @param {Array} labels - Labels (optional)
+   * @param {string} description - Description (optional)
+   * @returns {Promise<{success: boolean, id: string}>}
    */
   update: async (id, title, labels, description) => {
     return apiFetch(`${API_BASE}/templates/${id}`, {
@@ -205,7 +205,7 @@ export const templatesAPI = {
   /**
    * Delete a template
    * @param {string} id - Template ID
-   * @returns {Promise<null>}
+   * @returns {Promise<{success: boolean, id: string}>}
    */
   delete: async (id) => {
     return apiFetch(`${API_BASE}/templates/${id}`, {
@@ -227,10 +227,10 @@ export const templatesAPI = {
    * @param {string} id - Template ID
    * @param {string} version_number - Version Number
    * @param {string} content - Version Content
-   * @param {Array} variables - Template variables
+   * @param {Array} variables - Template variables (optional, format: [{name, type, description, default}])
    * @returns {Promise<{id: string, version_id: string}>}
    */
-  createVersions: async (id, version_number, content, variables = []) => {
+  createVersion: async (id, version_number, content, variables = []) => {
     return apiFetch(`${API_BASE}/templates/${id}/versions`, {
       method: 'POST',
       body: JSON.stringify({ version_number, content, variables }),
@@ -241,7 +241,7 @@ export const templatesAPI = {
    * Get a specific version of a template
    * @param {string} id - Template ID
    * @param {string} versionId - Version ID
-   * @returns {Promise<{template_id: string, version_id: string, metadata: Object, content: string}>}
+   * @returns {Promise<{template_id: string, id: string, version_number: string, created_at: string, author: string, content: string, variables: Array}>}
    */
   getVersion: async (id, versionId) => {
     return apiFetch(`${API_BASE}/templates/${id}/versions/${versionId}`);
@@ -255,11 +255,14 @@ export const templatesAPI = {
 export const chatsAPI = {
   /**
    * List all chats
-   * @param {Object} params - Query parameters (limit)
+   * @param {Object} params - Query parameters (provider, limit)
    * @returns {Promise<{chats: Array, count: number, total: number}>}
    */
   list: async (params = {}) => {
     const query = new URLSearchParams();
+    if (params.provider) {
+      query.append('provider', params.provider);
+    }
     if (params.limit) {
       query.append('limit', params.limit);
     }
@@ -278,9 +281,9 @@ export const chatsAPI = {
   },
 
   /**
-   * Create a new chat
-   * @param {Object} chatData - Chat data
-   * @returns {Promise<{id: string, created_at: string}>}
+   * Create a new chat (or update if conversation_id matches)
+   * @param {Object} chatData - Chat data (title, description, provider, conversation_id, messages, tags, created_at)
+   * @returns {Promise<{id: string, created_at: string, message: string}>} or {Promise<{id: string, updated_at: string, message: string}>} if updating
    */
   create: async (chatData) => {
     return apiFetch(`${API_BASE}/chats`, {
@@ -292,7 +295,7 @@ export const chatsAPI = {
   /**
    * Update a chat
    * @param {string} id - Chat ID
-   * @param {Object} chatData - Updated chat data
+   * @param {Object} chatData - Updated chat data (title, description, messages, tags, etc.)
    * @returns {Promise<{id: string, updated_at: string}>}
    */
   update: async (id, chatData) => {
@@ -321,8 +324,8 @@ export const chatsAPI = {
 export const searchAPI = {
   /**
    * Search across all items
-   * @param {Object} params - Search parameters
-   * @returns {Promise<{items: Array, count: number, next_cursor: string}>}
+   * @param {Object} params - Search parameters (type, labels, author, limit, cursor)
+   * @returns {Promise<Array>} Currently returns empty array (implementation incomplete on backend)
    */
   search: async (params = {}) => {
     const query = new URLSearchParams();
@@ -334,42 +337,11 @@ export const searchAPI = {
         query.append('labels', params.labels);
       }
     }
-    if (params.slug) query.append('slug', params.slug);
     if (params.author) query.append('author', params.author);
     if (params.limit) query.append('limit', params.limit);
     if (params.cursor) query.append('cursor', params.cursor);
 
     return apiFetch(`${API_BASE}/search?${query.toString()}`);
-  },
-};
-
-export const indexAPI = {
-  /**
-   * Get index status
-   * @returns {Promise<Object>} Status information
-   */
-  status: async () => {
-    return apiFetch(`${API_BASE}/index/status`);
-  },
-
-  /**
-   * Rebuild index
-   * @returns {Promise<{status: string, stats: Object}>}
-   */
-  rebuild: async () => {
-    return apiFetch(`${API_BASE}/index/rebuild`, {
-      method: 'POST',
-    });
-  },
-};
-
-export const healthAPI = {
-  /**
-   * Health check
-   * @returns {Promise<Object>} Health status
-   */
-  check: async () => {
-    return apiFetch(`${API_BASE}/health`);
   },
 };
 
@@ -379,6 +351,4 @@ export default {
   templates: templatesAPI,
   chats: chatsAPI,
   search: searchAPI,
-  index: indexAPI,
-  health: healthAPI,
 };

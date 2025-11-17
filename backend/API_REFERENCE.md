@@ -19,16 +19,22 @@
 - 查询参数：
   - `labels`：可重复，按 AND 过滤（例如 `?labels=a&labels=b`）。
   - `limit`：返回数量上限，默认 100。
-- 响应：
+- 响应字段：
+  - `items`：按 `updated_at`（或 `created_at`）倒序后的摘要数组，对应 `apps.core.domain.itemmetadata.ItemSummary`。
+  - `count`：返回数量。
+  - `total`：总数量（未裁剪前）。
+- 响应示例：
   ```json
   {
-    "prompts": [
+    "items": [
       {
         "id": "01HF6X...W8W",
         "title": "Greeting",
         "type": "prompt",
         "labels": ["demo"],
+        "description": "示例",
         "updated_at": "2024-05-06T10:15:00Z",
+        "created_at": "2024-05-06T10:15:00Z",
         "author": "You"
       }
     ],
@@ -38,20 +44,21 @@
   ```
 
 ### POST /prompts
-- 用途：创建新的 Prompt，初始版本号由后端写入 `"inital"`。
+- 用途：创建新的 Prompt，初始版本号固定写入 `"initial"`。
 - 请求体字段：
   - `title` *(必填, string)*
-  - `content` *(必填, string)*：正文（可含 front matter，但后端仅把内容写入版本文件）。
+  - `content` *(必填, string)*：正文内容。
   - `labels` *(可选, string[] 默认 `[]`)* 
   - `description` *(可选, string, 默认 `""`)*
-  - 其他字段会被忽略；`author` 在后端强制写入 `"You"`。
-- 成功响应：`201 Created`
+  - 其他字段会被忽略；`author` 在后端固定为 `"You"`。
+- 成功响应：`200 OK`
   ```json
-  { "id": "01HF6X...W8W", "version_id": "abc12" }
+  { "success": true, "id": "01HF6X...W8W", "version_id": "abc12" }
   ```
 
 ### GET /prompts/{prompt_id}
-- 返回该 Prompt 的元数据（不含正文），来自 `prompt.yaml`：
+- 返回 `prompt.yaml` 中的摘要（字段同列表项，不包含正文与版本数组）。
+- 响应示例：
   ```json
   {
     "id": "01HF6X...W8W",
@@ -61,25 +68,24 @@
     "description": "示例",
     "updated_at": "2024-05-06T10:15:00Z",
     "created_at": "2024-05-06T10:15:00Z",
-    "author": "You",
-    "versions": [
-      { "id": "abc12", "version_number": "inital", "created_at": "2024-05-06T10:15:00Z" }
-    ]
+    "author": "You"
   }
   ```
 
 ### PUT /prompts/{prompt_id}
-- 用途：创建一个新版本（不会覆盖旧版本）。
+- 用途：仅更新元数据（标题、标签、描述），不会创建新版本。
 - 请求体字段：
-  - `content` *(必填, string)*
-  - `version_number` *(必填, string 或 int)*：写入到版本 front matter。
+  - `title` *(可选, string)*
+  - `labels` *(可选, string[])*
+  - `description` *(可选, string)*
 - 成功响应：`200 OK`
   ```json
-  { "id": "01HF6X...W8W", "version_id": "def34" }
+  { "success": true, "id": "01HF6X...W8W" }
   ```
 
 ### DELETE /prompts/{prompt_id}
-- 用途：删除该 Prompt 及其所有版本。成功返回 `204 No Content`。
+- 用途：删除该 Prompt 及其所有版本。
+- 成功响应：`200 OK`，返回 `{ "success": true, "id": "..." }`。
 
 ### GET /prompts/{prompt_id}/versions
 - 返回该 Prompt 的全部版本摘要，来源于元数据：
@@ -87,24 +93,32 @@
   {
     "prompt_id": "01HF6X...W8W",
     "versions": [
-      { "id": "abc12", "version_number": "inital", "created_at": "2024-05-06T10:15:00Z" },
+      { "id": "abc12", "version_number": "initial", "created_at": "2024-05-06T10:15:00Z" },
       { "id": "def34", "version_number": "2", "created_at": "2024-05-07T09:00:00Z" }
     ],
     "count": 2
   }
   ```
 
+### POST /prompts/{prompt_id}/versions
+- 用途：基于现有 Prompt 创建新版本（正文 + 版本号）。
+- 请求体字段：
+  - `content` *(必填, string)*
+  - `version_number` *(必填, string)*
+- 成功响应：`200 OK`
+  ```json
+  { "id": "01HF6X...W8W", "version_id": "def34" }
+  ```
+
 ### GET /prompts/{prompt_id}/versions/{version_id}
-- 返回指定版本的 front matter 与正文：
+- 返回指定版本的 front matter 字段（平铺在顶层）与正文：
   ```json
   {
     "prompt_id": "01HF6X...W8W",
-    "frontmatter": {
-      "id": "def34",
-      "version_number": "2",
-      "created_at": "2024-05-07T09:00:00Z",
-      "author": "You"
-    },
+    "id": "def34",
+    "version_number": "2",
+    "created_at": "2024-05-07T09:00:00Z",
+    "author": "You",
     "content": "# Prompt v2 内容"
   }
   ```
@@ -115,8 +129,8 @@
 ## Templates
 
 ### GET /templates
-- 查询参数与行为同 `/prompts`（支持 `labels` 与 `limit`）。
-- 响应字段同 Prompt 列表，`type` 固定为 `"template"`。
+- 查询参数与 `/prompts` 相同（`labels`、`limit`）。
+- 响应字段：`items` / `count` / `total`，结构同 Prompt 列表，不过 `type` 恒为 `"template"`。
 
 ### POST /templates
 - 用途：创建新的 Template。
@@ -137,21 +151,21 @@
   ```
 
 ### GET /templates/{template_id}
-- 返回模板元数据（不含正文），结构同 Prompt 元数据。
+- 返回模板摘要（字段同 `/prompts/{id}` 响应，不含正文与版本数组）。
 
 ### PUT /templates/{template_id}
-- 用途：创建新版本。
+- 用途：仅更新模板元数据（标题、标签、描述）。
 - 请求体字段：
-  - `content` *(必填, string)*
-  - `version_number` *(必填, string 或 int)*
-  - `variables` *(可选, object[])*：同 POST。
+  - `title` *(可选, string)*
+  - `labels` *(可选, string[])*
+  - `description` *(可选, string)*
 - 成功响应：`200 OK`
   ```json
-  { "id": "01HF6Y...3AB", "version_id": "t5678" }
+  { "success": true, "id": "01HF6Y...3AB" }
   ```
 
 ### DELETE /templates/{template_id}
-- 删除模板及其版本。成功返回 `204 No Content`。
+- 删除模板及其版本，成功返回 `200 OK` 与 `{ "success": true, "id": "..." }`。
 
 ### GET /templates/{template_id}/versions
 - 返回模板所有版本摘要：
@@ -159,26 +173,35 @@
   {
     "template_id": "01HF6Y...3AB",
     "versions": [
-      { "id": "t1234", "version_number": "inital", "created_at": "2024-05-06T10:20:00Z" }
+      { "id": "t1234", "version_number": "initial", "created_at": "2024-05-06T10:20:00Z" }
     ],
     "count": 1
   }
   ```
 
+### POST /templates/{template_id}/versions
+- 用途：基于现有模板创建新版本。
+- 请求体字段：
+  - `content` *(必填, string)*
+  - `version_number` *(必填, string)*
+  - `variables` *(可选, object[])*：字段同创建接口，缺省时可以传 `[]`。
+- 成功响应：`200 OK`
+  ```json
+  { "id": "01HF6Y...3AB", "version_id": "t5678" }
+  ```
+
 ### GET /templates/{template_id}/versions/{version_id}
-- 返回指定版本正文与 front matter（包含变量声明）：
+- 返回指定版本正文与 front matter 字段（含变量，字段平铺在顶层）：
   ```json
   {
     "template_id": "01HF6Y...3AB",
-    "frontmatter": {
-      "id": "t1234",
-      "version_number": "inital",
-      "created_at": "2024-05-06T10:20:00Z",
-      "author": "You",
-      "variables": [
-        { "name": "sender", "type": "str", "description": "发件人", "default_value": "Support Team" }
-      ]
-    },
+    "id": "t1234",
+    "version_number": "initial",
+    "created_at": "2024-05-06T10:20:00Z",
+    "author": "You",
+    "variables": [
+      { "name": "sender", "type": "str", "description": "发件人", "default_value": "Support Team" }
+    ],
     "content": "# 模板正文"
   }
   ```
