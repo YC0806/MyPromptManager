@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Save, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
@@ -16,9 +16,10 @@ export default function TemplateCreate() {
     title: '',
     description: '',
     labels: [],
-    variables: [] // Array of { name, description, default }
   })
   const [content, setContent] = useState('')
+  const [variables, setVariables] = useState([])
+  const variableHistoryRef = useRef(new Map())
   const [newLabel, setNewLabel] = useState('')
   const [saving, setSaving] = useState(false)
 
@@ -29,7 +30,38 @@ export default function TemplateCreate() {
     return [...new Set(matches.map(m => m[1]))]
   }
 
-  const detectedVariables = extractVariables(content)
+  const rememberVariables = (vars = []) => {
+    const history = variableHistoryRef.current
+    vars.forEach(variable => {
+      if (!variable?.name) return
+      history.set(variable.name, {
+        description: variable.description || '',
+        default: variable.default || '',
+      })
+    })
+  }
+
+  const syncVariablesWithContent = (text, sourceVariables = []) => {
+    const detectedVariables = extractVariables(text)
+    const variableMap = new Map(sourceVariables.map(variable => [variable.name, variable]))
+    return detectedVariables.map(varName => {
+      const existing = variableMap.get(varName) || variableHistoryRef.current.get(varName)
+      return {
+        name: varName,
+        description: existing?.description || '',
+        default: existing?.default || '',
+      }
+    })
+  }
+
+  const updateVariables = (text) => {
+    setVariables(prevVariables => {
+      rememberVariables(prevVariables)
+      const synced = syncVariablesWithContent(text, prevVariables)
+      rememberVariables(synced)
+      return synced
+    })
+  }
 
   const handleAddLabel = () => {
     if (newLabel.trim() && !metadata.labels.includes(newLabel.trim())) {
@@ -46,29 +78,37 @@ export default function TemplateCreate() {
   }
 
   const handleVariableChange = (varName, field, value) => {
-    const updatedVars = metadata.variables.filter(v => v.name !== varName)
-    updatedVars.push({
-      name: varName,
-      description: field === 'description' ? value : (metadata.variables.find(v => v.name === varName)?.description || ''),
-      default: field === 'default' ? value : (metadata.variables.find(v => v.name === varName)?.default || '')
+    setVariables(prevVariables => {
+      const updated = prevVariables.map(variable =>
+        variable.name === varName
+          ? { ...variable, [field]: value }
+          : variable
+      )
+      rememberVariables(updated)
+      return updated
     })
-    setMetadata({ ...metadata, variables: updatedVars })
   }
 
   const handleSave = async () => {
+    if (!metadata.title.trim()) {
+      alert('Please enter a title')
+      return
+    }
+
+    if (!content.trim()) {
+      alert('Please enter content')
+      return
+    }
+
     try {
       setSaving(true)
-      const frontmatter = `---
-title: ${metadata.title}
-description: ${metadata.description}
-labels: ${JSON.stringify(metadata.labels)}
-type: template
-variables: ${JSON.stringify(metadata.variables)}
----
-
-${content}`
-
-      const response = await templatesAPI.create(frontmatter)
+      const response = await templatesAPI.create(
+        metadata.title,
+        content,
+        metadata.labels,
+        metadata.description,
+        variables
+      )
       navigate(`/templates/${response.id}`)
     } catch (error) {
       console.error('Failed to create template:', error)
@@ -125,7 +165,11 @@ ${content}`
               <CardContent>
                 <Textarea
                   value={content}
-                  onChange={(e) => setContent(e.target.value)}
+                  onChange={(e) => {
+                    const newContent = e.target.value
+                    setContent(newContent)
+                    updateVariables(newContent)
+                  }}
                   className="min-h-[500px] font-mono text-sm"
                   placeholder="Enter your template content...
 
@@ -138,36 +182,36 @@ Use {{variable}} syntax for dynamic values."
                 <div className="flex items-center justify-between mt-4 text-xs text-zinc-500">
                   <span>
                     Words: {content.split(/\s+/).filter(w => w.length > 0).length} |
-                    Variables: {detectedVariables.length}
+                    Variables: {variables.length}
                   </span>
                 </div>
               </CardContent>
             </Card>
 
             {/* Detected Variables */}
-            {detectedVariables.length > 0 && (
+            {variables.length > 0 && (
               <Card className="mt-6">
                 <CardHeader>
                   <CardTitle>Variable Descriptions</CardTitle>
-                  <CardDescription>Define descriptions and defaults for each variable</CardDescription>
+                  <CardDescription>Define descriptions and defaults for detected variables</CardDescription>
                 </CardHeader>
                 <CardContent>
                   <div className="space-y-4">
-                    {detectedVariables.map((varName) => (
-                      <div key={varName} className="p-4 bg-purple-50 rounded-lg border border-purple-200">
+                    {variables.map((variable) => (
+                      <div key={variable.name} className="p-4 bg-purple-50 rounded-lg border border-purple-200">
                         <div className="font-mono text-sm font-semibold text-purple-700 mb-3">
-                          {`{{${varName}}}`}
+                          {`{{${variable.name}}}`}
                         </div>
                         <div className="space-y-2">
                           <Input
                             placeholder="Description..."
-                            value={metadata.variables.find(v => v.name === varName)?.description || ''}
-                            onChange={(e) => handleVariableChange(varName, 'description', e.target.value)}
+                            value={variable.description || ''}
+                            onChange={(e) => handleVariableChange(variable.name, 'description', e.target.value)}
                           />
                           <Input
                             placeholder="Default value..."
-                            value={metadata.variables.find(v => v.name === varName)?.default || ''}
-                            onChange={(e) => handleVariableChange(varName, 'default', e.target.value)}
+                            value={variable.default || ''}
+                            onChange={(e) => handleVariableChange(variable.name, 'default', e.target.value)}
                           />
                         </div>
                       </div>

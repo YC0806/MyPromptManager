@@ -36,18 +36,24 @@ export default function PromptCreate() {
   }
 
   const handleSave = async () => {
+    if (!metadata.title.trim()) {
+      alert('Please enter a title')
+      return
+    }
+
+    if (!content.trim()) {
+      alert('Please enter content')
+      return
+    }
+
     try {
       setSaving(true)
-      // Create frontmatter format
-      const frontmatter = `---
-title: ${metadata.title}
-description: ${metadata.description}
-labels: ${JSON.stringify(metadata.labels)}
----
-
-${content}`
-
-      const response = await promptsAPI.create(frontmatter)
+      const response = await promptsAPI.create(
+        metadata.title,
+        content,
+        metadata.labels,
+        metadata.description
+      )
       // Navigate to the newly created prompt
       navigate(`/prompts/${response.id}`)
     } catch (error) {
