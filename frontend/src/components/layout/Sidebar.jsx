@@ -34,7 +34,6 @@ const navSections = [
       { name: 'Prompts', icon: FileText, path: '/prompts' },
       { name: 'Templates', icon: FileCode, path: '/templates' },
       { name: 'Chats', icon: MessageSquare, path: '/chats' },
-      { name: 'AI Histories', icon: History, path: '/ai-histories' },
       { name: 'Releases', icon: Package, path: '/releases' },
       { name: 'Timeline', icon: Clock, path: '/timeline' },
       { name: 'Channels', icon: Radio, path: '/channels' },
@@ -80,7 +79,7 @@ export default function Sidebar() {
         </div>
         <div>
           <h1 className="text-lg font-bold text-zinc-900">MyPrompt</h1>
-          <p className="text-xs text-zinc-500">Manager</p>
+          <p className="text-xs text-zinc-500">v0.0.1</p>
         </div>
       </div>
 

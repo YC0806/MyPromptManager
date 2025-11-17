@@ -7,5 +7,5 @@ from django.urls import path, include
 urlpatterns = [
     path('admin/', admin.site.urls),
     # Unified API (replaces simple/detail dual architecture)
-    path('v1/', include('apps.api.urls')),
+    path('v1/', include('backend.apps.api.urls')),
 ]

@@ -27,7 +27,7 @@ import {
 } from '@/components/ui/select'
 import Breadcrumb from '@/components/layout/Breadcrumb'
 import useStore from '@/store/useStore'
-import { searchAPI } from '@/lib/api'
+import { templatesAPI } from '@/lib/api'
 import { formatDate, getLabelColor } from '@/lib/utils'
 
 export default function TemplatesList() {
@@ -52,7 +52,7 @@ export default function TemplatesList() {
   const loadTemplates = async () => {
     try {
       setLoading(true)
-      const response = await searchAPI.search({
+      const response = await templatesAPI.list({
         type: 'template',
         labels: filters.label || undefined,
         author: filters.author || undefined,

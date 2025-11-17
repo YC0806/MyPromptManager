@@ -9,8 +9,8 @@ import hashlib
 
 from django.conf import settings
 
-from apps.core.exceptions import ValidationError, ConflictError
-from apps.core.utils.frontmatter import parse_frontmatter
+from backend.apps.core.exceptions import ValidationError
+from backend.apps.core.utils.frontmatter import parse_frontmatter
 
 
 class VersionService:

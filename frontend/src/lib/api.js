@@ -56,7 +56,7 @@ export const promptsAPI = {
   /**
    * Get prompt by ID (HEAD version)
    * @param {string} id - Prompt ID
-   * @returns {Promise<{id: string, metadata: Object, content: string}>}
+   * @returns {Promise<{id: string, title: string, type: string, labels: list, description: string, updated_at: string, created_at: string, author: string}>}
    */
   get: async (id) => {
     return apiFetch(`${API_BASE}/prompts/${id}`);
@@ -64,26 +64,31 @@ export const promptsAPI = {
 
   /**
    * Create a new prompt
-   * @param {string} content - Prompt content (with frontmatter)
+   * @param {string} title - Prompt title
+   * @param {string} content - Prompt content
+   * @param {list} labels
+   * @param {string} description
    * @returns {Promise<{id: string, version_id: string, created_at: string}>}
    */
-  create: async (content) => {
+  create: async (title, content, labels, description) => {
     return apiFetch(`${API_BASE}/prompts`, {
       method: 'POST',
-      body: JSON.stringify({ content }),
+      body: JSON.stringify({ title, content, labels, description}),
     });
   },
 
   /**
-   * Update a prompt (creates new version)
+   * Update a prompt
    * @param {string} id - Prompt ID
-   * @param {string} content - Updated content
+   * @param {string} title - Prompt Title
+   * @param {list} labels
+   * @param {string} description
    * @returns {Promise<{id: string, version_id: string, updated_at: string}>}
    */
-  update: async (id, content) => {
+  update: async (id, title, labels, description) => {
     return apiFetch(`${API_BASE}/prompts/${id}`, {
       method: 'PUT',
-      body: JSON.stringify({ content }),
+      body: JSON.stringify({ title, labels, description }),
     });
   },
 
@@ -110,6 +115,20 @@ export const promptsAPI = {
   /**
    * Get a specific version of a prompt
    * @param {string} id - Prompt ID
+   * @param {string} version_number - Version Number
+   * @param {string} content - Version Content
+   * @returns {Promise<{id: string, version_id: string}>}
+   */
+  createVersions: async (id, version_number, content) => {
+      return apiFetch(`${API_BASE}/prompts/${id}/versions`, {
+          method: 'POST',
+          body: JSON.stringify({version_number, content}),
+    });
+  },
+
+  /**
+   * Get a specific version of a prompt
+   * @param {string} id - Prompt ID
    * @param {string} versionId - Version ID
    * @returns {Promise<{prompt_id: string, version_id: string, metadata: Object, content: string}>}
    */
@@ -117,6 +136,8 @@ export const promptsAPI = {
     return apiFetch(`${API_BASE}/prompts/${id}/versions/${versionId}`);
   },
 };
+
+
 
 // ============================================================================
 // Templates API
@@ -144,7 +165,7 @@ export const templatesAPI = {
   /**
    * Get template by ID (HEAD version)
    * @param {string} id - Template ID
-   * @returns {Promise<{id: string, metadata: Object, content: string}>}
+   * @returns {Promise<{id: string, title: string, type: string, labels: list, description: string, updated_at: string, created_at: string, author: string}>}
    */
   get: async (id) => {
     return apiFetch(`${API_BASE}/templates/${id}`);
@@ -152,26 +173,32 @@ export const templatesAPI = {
 
   /**
    * Create a new template
-   * @param {string} content - Template content (with frontmatter)
+   * @param {string} title - Template title
+   * @param {string} content - Template content
+   * @param {list} labels
+   * @param {string} description
+   * @param {list} variables
    * @returns {Promise<{id: string, version_id: string, created_at: string}>}
    */
-  create: async (content) => {
+  create: async (title, content, labels, description, variables) => {
     return apiFetch(`${API_BASE}/templates`, {
       method: 'POST',
-      body: JSON.stringify({ content }),
+      body: JSON.stringify({ title, content, labels, description, variables}),
     });
   },
 
   /**
-   * Update a template (creates new version)
+   * Update a template
    * @param {string} id - Template ID
-   * @param {string} content - Updated content
+   * @param {string} title - Template Title
+   * @param {list} labels
+   * @param {string} description
    * @returns {Promise<{id: string, version_id: string, updated_at: string}>}
    */
-  update: async (id, content) => {
+  update: async (id, title, labels, description) => {
     return apiFetch(`${API_BASE}/templates/${id}`, {
       method: 'PUT',
-      body: JSON.stringify({ content }),
+      body: JSON.stringify({ title, labels, description }),
     });
   },
 
@@ -193,6 +220,21 @@ export const templatesAPI = {
    */
   listVersions: async (id) => {
     return apiFetch(`${API_BASE}/templates/${id}/versions`);
+  },
+
+  /**
+   * Create a new version of a template
+   * @param {string} id - Template ID
+   * @param {string} version_number - Version Number
+   * @param {string} content - Version Content
+   * @param {Array} variables - Template variables
+   * @returns {Promise<{id: string, version_id: string}>}
+   */
+  createVersions: async (id, version_number, content, variables = []) => {
+    return apiFetch(`${API_BASE}/templates/${id}/versions`, {
+      method: 'POST',
+      body: JSON.stringify({ version_number, content, variables }),
+    });
   },
 
   /**

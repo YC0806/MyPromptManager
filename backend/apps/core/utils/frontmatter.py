@@ -26,6 +26,8 @@ def parse_frontmatter(content: str) -> Tuple[Dict, str]:
     frontmatter_content = match.group(1).strip()
     body = match.group(2)
 
+    print(body)
+
     # Try to parse as JSON first (if it starts with {)
     if frontmatter_content.startswith('{'):
         try:

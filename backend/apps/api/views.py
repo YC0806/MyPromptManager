@@ -1,17 +1,16 @@
 """
 Unified API views for prompts, templates, and chats.
 """
+from django.http import JsonResponse
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
-from django.conf import settings
 import datetime
 
-from apps.core.services.file_storage_service import FileStorageService
-from apps.core.exceptions import ResourceNotFoundError, ValidationError, BadRequestError
-from apps.core.domain.metadata import Metadata
-from apps.core.domain.version import TemplateVariable
-
+from backend.apps.core.services.file_storage_service import FileStorageService
+from backend.apps.core.exceptions import ValidationError, BadRequestError
+from backend.apps.core.domain.itemmetadata import ItemMetadata
+from backend.apps.core.domain.version import TemplateVariable
 
 # ============================================================================
 # Prompts
@@ -26,8 +25,6 @@ class PromptsListView(APIView):
     def get(self, request):
         """List all prompts."""
         storage = FileStorageService()
-
-        # TODO optimize with indexing
         prompts = storage.list_all_items('prompt')
 
         # Apply filters if provided
@@ -41,7 +38,7 @@ class PromptsListView(APIView):
         prompts.sort(key=lambda x: x.updated_at or x.created_at or "", reverse=True)
 
         return Response({
-            'prompts': [p.to_summary().__dict__() for p in prompts[:limit]],
+            'items': [p.to_summary().__dict__() for p in prompts[:limit]],
             'count': len(prompts[:limit]),
             'total': len(prompts),
         })
@@ -60,7 +57,7 @@ class PromptsListView(APIView):
         if not content:
             raise BadRequestError("content is required")
 
-        metadata = Metadata(
+        metadata = ItemMetadata(
             id='',
             title=title,
             type='prompt',
@@ -76,29 +73,72 @@ class PromptsListView(APIView):
         storage = FileStorageService()
         item_id, version_id = storage.create_item('prompt', metadata, content, None)
 
-        return Response({
+        return JsonResponse({
+            'success': True,
             'id': item_id,
             'version_id': version_id
-        }, status=status.HTTP_201_CREATED)
+        }, status=status.HTTP_200_OK)
 
 
 class PromptDetailView(APIView):
     """
     GET /v1/prompts/{id} - Get prompt metadata
-    PUT /v1/prompts/{id} - Update prompt (create new version)
+    PUT /v1/prompts/{id} - Update prompt metadata
     DELETE /v1/prompts/{id} - Delete prompt
     """
 
     def get(self, request, prompt_id):
-        """Get prompt details (HEAD version)."""
+        """Get prompt metadata"""
         storage = FileStorageService()
 
         metadata = storage.load_metadata('prompt', prompt_id)
 
-        return Response(metadata.__dict__())
+        return JsonResponse(metadata.to_summary().__dict__(), status=status.HTTP_200_OK)
 
     def put(self, request, prompt_id):
-        """Update prompt (creates new version)."""
+        """Update prompt metadata"""
+        title = request.data.get('title')
+        labels = request.data.get('labels', [])
+        description = request.data.get('description', '')
+        author = "You"  # Default author
+
+        storage = FileStorageService()
+        storage.update_item("prompt", prompt_id, title, labels, description, author)
+
+        return JsonResponse({'success': True, 'id': prompt_id}, status=status.HTTP_200_OK)
+
+
+    def delete(self, request, prompt_id):
+        """Delete prompt."""
+        storage = FileStorageService()
+
+        # Delete from storage
+        storage.delete_item('prompt', prompt_id)
+
+        return JsonResponse({'success': True, 'id': prompt_id}, status=status.HTTP_200_OK)
+
+
+class PromptVersionsView(APIView):
+    """
+    GET /v1/prompts/{id}/versions - List all versions
+    POST /v1/prompts/{id}/versions - Create a new version
+    """
+
+    def get(self, request, prompt_id):
+        """List all versions of a prompt."""
+        storage = FileStorageService()
+
+        # Get versions
+        versions = storage.list_versions('prompt', prompt_id)
+
+        return Response({
+            'prompt_id': prompt_id,
+            'versions': [v.__dict__() for v in versions],
+            'count': len(versions),
+        })
+
+    def post(self, request, prompt_id):
+        """Create a new version of a prompt."""
         version_number = request.data.get('version_number')
         content = request.data.get('content')
         if not content:
@@ -114,38 +154,9 @@ class PromptDetailView(APIView):
         # Create new version
         version_id = storage.create_version(metadata, version_number, content, None)
 
-
         return Response({
             'id': prompt_id,
             'version_id': version_id
-        })
-
-    def delete(self, request, prompt_id):
-        """Delete prompt."""
-        storage = FileStorageService()
-
-        # Delete from storage
-        storage.delete_item('prompt', prompt_id)
-
-        return Response(status=status.HTTP_204_NO_CONTENT)
-
-
-class PromptVersionsView(APIView):
-    """
-    GET /v1/prompts/{id}/versions - List all versions
-    """
-
-    def get(self, request, prompt_id):
-        """List all versions of a prompt."""
-        storage = FileStorageService()
-
-        # Get versions
-        versions = storage.list_versions('prompt', prompt_id)
-
-        return Response({
-            'prompt_id': prompt_id,
-            'versions': [v.__dict__() for v in versions],
-            'count': len(versions),
         })
 
 
@@ -162,11 +173,11 @@ class PromptVersionDetailView(APIView):
         # Read specific version
         version_data = storage.read_version('prompt', prompt_id, version_id)
 
-        return Response({
+        return JsonResponse({
             'prompt_id': prompt_id,
-            'frontmatter': version_data.__dict__(),
+            **version_data.__dict__(),
             'content': version_data.content,
-        })
+        }, status=status.HTTP_200_OK)
 
     def delete(self, request, prompt_id, version_id):
         """Delete a specific version of a prompt."""
@@ -203,7 +214,7 @@ class TemplatesListView(APIView):
         templates.sort(key=lambda x: x.updated_at or x.created_at or "", reverse=True)
 
         return Response({
-            'templates': [t.to_summary().__dict__() for t in templates[:limit]],
+            'items': [t.to_summary().__dict__() for t in templates[:limit]],
             'count': len(templates[:limit]),
             'total': len(templates),
         })
@@ -224,7 +235,7 @@ class TemplatesListView(APIView):
         
         variables = [TemplateVariable.from_dict(v) for v in request.data.get('variables', [])]
 
-        metadata = Metadata(
+        metadata = ItemMetadata(
             id='',
             title=title,
             type='template',
@@ -256,37 +267,23 @@ class TemplateDetailView(APIView):
         """Get template details (HEAD version)."""
         storage = FileStorageService()
 
-        # Read HEAD version
         metadata = storage.load_metadata('template', template_id)
 
-        return Response(metadata.__dict__())
+        return Response(metadata.to_summary().__dict__())
 
     def put(self, request, template_id):
-        """Update template (creates new version)."""
-        version_number = request.data.get('version_number')
-        content = request.data.get('content')
-
-        if not content:
-            raise BadRequestError("content is required")
-        if version_number is None:
-            raise BadRequestError("version_number is required")
-        
-        variables = [TemplateVariable.from_dict(v) for v in request.data.get('variables', [])]
+        """Update prompt metadata"""
+        title = request.data.get('title')
+        labels = request.data.get('labels', [])
+        description = request.data.get('description', '')
+        author = "You"  # Default author
 
         storage = FileStorageService()
+        storage.update_item("template", template_id, title, labels, description, author)
 
-        # Get existing metadata
-        metadata = storage.load_metadata('template', template_id)
+        return JsonResponse({'success': True, 'id': template_id}, status=status.HTTP_200_OK)
 
-        
 
-        # Create new version
-        version_id = storage.create_version(metadata, version_number, content, variables)
-
-        return Response({
-            'id': template_id,
-            'version_id': version_id
-        })
 
     def delete(self, request, template_id):
         """Delete template."""
@@ -294,7 +291,7 @@ class TemplateDetailView(APIView):
         # Delete from storage
         storage.delete_item('template', template_id)
 
-        return Response(status=status.HTTP_204_NO_CONTENT)
+        return JsonResponse({'success': True, 'id': template_id}, status=status.HTTP_200_OK)
 
 
 class TemplateVersionsView(APIView):
@@ -315,6 +312,30 @@ class TemplateVersionsView(APIView):
             'count': len(versions),
         })
 
+    def post(self, request, template_id):
+        """Update template (creates new version)."""
+        version_number = request.data.get('version_number')
+        content = request.data.get('content')
+        if not content:
+            raise BadRequestError("content is required")
+        if version_number is None:
+            raise BadRequestError("version_number is required")
+
+        variables = [TemplateVariable.from_dict(v) for v in request.data.get('variables', [])]
+
+        storage = FileStorageService()
+
+        # Get existing metadata
+        metadata = storage.load_metadata('template', template_id)
+
+        # Create new version
+        version_id = storage.create_version(metadata, version_number, content, variables)
+
+        return Response({
+            'id': template_id,
+            'version_id': version_id
+        })
+
 
 class TemplateVersionDetailView(APIView):
     """
@@ -328,11 +349,11 @@ class TemplateVersionDetailView(APIView):
         # Read specific version
         version_data = storage.read_version('template', template_id, version_id)
 
-        return Response({
+        return JsonResponse({
             'template_id': template_id,
-            'frontmatter': version_data.__dict__(),
+            **version_data.__dict__(),
             'content': version_data.content,
-        })
+        }, status=status.HTTP_200_OK)
     
     def delete(self, request, template_id, version_id):
         """Delete a specific version of a template."""

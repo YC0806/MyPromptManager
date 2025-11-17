@@ -27,7 +27,7 @@ import {
 } from '@/components/ui/select'
 import Breadcrumb from '@/components/layout/Breadcrumb'
 import useStore from '@/store/useStore'
-import { searchAPI } from '@/lib/api'
+import { searchAPI, promptsAPI} from '@/lib/api'
 import { formatDate, getLabelColor, getStatusColor } from '@/lib/utils'
 
 export default function PromptsList() {
@@ -52,7 +52,7 @@ export default function PromptsList() {
   const loadPrompts = async () => {
     try {
       setLoading(true)
-      const response = await searchAPI.search({
+      const response = await promptsAPI.list({
         type: 'prompt', // Only fetch prompts
         labels: filters.label || undefined,
         author: filters.author || undefined,
@@ -67,7 +67,7 @@ export default function PromptsList() {
         if (sortBy === 'title') {
           aVal = (aVal || '').toLowerCase()
           bVal = (bVal || '').toLowerCase()
-        } else if (sortBy === 'updated_at' || sortBy === 'created_at') {
+        } else if (sortBy === 'updated_at') {
           aVal = new Date(aVal || 0).getTime()
           bVal = new Date(bVal || 0).getTime()
         }
@@ -103,10 +103,13 @@ export default function PromptsList() {
       <Breadcrumb items={breadcrumbItems} />
 
       <div className="max-w-7xl mx-auto px-8 py-8">
-        {/* Page Header */}
+        {/* Page Header */}        
         <div className="flex items-center justify-between mb-8">
           <div>
-            <h1 className="text-3xl font-bold text-zinc-900">Prompts</h1>
+            <div className="flex items-center gap-3">
+              <FileText className="w-8 h-8 text-teal-500" />
+              <h1 className="text-3xl font-bold text-zinc-900">Prompts</h1>
+            </div>
             <p className="text-zinc-600 mt-1">Manage your prompt templates and versions</p>
           </div>
           <Button
@@ -237,12 +240,6 @@ function TableView({ prompts, onSelect, navigate }) {
               Labels
             </th>
             <th className="text-left px-6 py-3 text-xs font-semibold text-zinc-600 uppercase tracking-wide">
-              Latest Release
-            </th>
-            <th className="text-left px-6 py-3 text-xs font-semibold text-zinc-600 uppercase tracking-wide">
-              Status
-            </th>
-            <th className="text-left px-6 py-3 text-xs font-semibold text-zinc-600 uppercase tracking-wide">
               Updated
             </th>
             <th className="text-left px-6 py-3 text-xs font-semibold text-zinc-600 uppercase tracking-wide">
@@ -280,23 +277,6 @@ function TableView({ prompts, onSelect, navigate }) {
                     <Badge variant="outline">+{prompt.labels.length - 3}</Badge>
                   )}
                 </div>
-              </td>
-              <td className="px-6 py-4">
-                {prompt.latestRelease ? (
-                  <div className="flex items-center gap-2">
-                    <Badge variant="outline" className="font-mono text-xs">
-                      {prompt.latestRelease.version}
-                    </Badge>
-                    <Badge variant={prompt.latestRelease.channel === 'prod' ? 'success' : 'secondary'}>
-                      {prompt.latestRelease.channel}
-                    </Badge>
-                  </div>
-                ) : (
-                  <span className="text-zinc-400 text-sm">No releases</span>
-                )}
-              </td>
-              <td className="px-6 py-4">
-                <StatusBadge status={prompt.draftStatus || 'in_sync'} />
               </td>
               <td className="px-6 py-4 text-sm text-zinc-600">
                 {formatDate(prompt.updated_at)}
@@ -384,7 +364,6 @@ function CardsView({ prompts, onSelect, navigate }) {
               ) : (
                 <span className="text-xs text-zinc-400">No releases</span>
               )}
-              <StatusBadge status={prompt.draftStatus || 'in_sync'} />
             </div>
           </CardContent>
           <CardFooter className="text-xs text-zinc-500">
@@ -400,21 +379,5 @@ function CardsView({ prompts, onSelect, navigate }) {
         </div>
       )}
     </div>
-  )
-}
-
-function StatusBadge({ status }) {
-  const statusConfig = {
-    in_sync: { label: '✅ In sync', variant: 'success' },
-    draft_ahead: { label: '📝 Draft ahead', variant: 'warning' },
-    behind: { label: '⚠️ Behind', variant: 'destructive' },
-  }
-
-  const config = statusConfig[status] || statusConfig.in_sync
-
-  return (
-    <Badge variant={config.variant} className="text-xs">
-      {config.label}
-    </Badge>
   )
 }

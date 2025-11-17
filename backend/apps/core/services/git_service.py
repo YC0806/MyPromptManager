@@ -2,9 +2,8 @@
 Git operations service using dulwich.
 Handles low-level Git operations for the prompt repository.
 """
-import os
 from pathlib import Path
-from typing import Optional, List, Dict, Tuple
+from typing import Optional, List, Dict
 from datetime import datetime
 import json
 
@@ -14,7 +13,7 @@ from dulwich.objects import Commit, Tag
 from dulwich.errors import NotGitRepository
 from django.conf import settings
 
-from apps.core.exceptions import ResourceNotFoundError, ConflictError
+from backend.apps.core.exceptions import ResourceNotFoundError
 
 
 class GitService:

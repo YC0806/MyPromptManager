@@ -2,7 +2,7 @@ from dataclasses import dataclass
 from typing import List, Optional
 import json
 
-from apps.core.utils.frontmatter import parse_frontmatter
+from backend.apps.core.utils.frontmatter import parse_frontmatter
 
 @dataclass
 class VersionData:
@@ -43,14 +43,14 @@ class TemplateVariable:
     name: str
     type: type
     description: Optional[str] = None
-    default_value: Optional[str] = None
+    default: Optional[str] = None
 
     def __dict__(self) -> dict:
         return {
             "name": self.name,
             "type": self.type.__name__,
             "description": self.description,
-            "default_value": self.default_value,
+            "default": self.default,
         }
     
     @classmethod
@@ -66,8 +66,8 @@ class TemplateVariable:
         return cls(
             name=data["name"],
             type=var_type,
-            description=data.get("description"),
-            default_value=data.get("default_value"),
+            description=data.get("description", ""),
+            default=data.get("default", ""),
         )
 
 @dataclass

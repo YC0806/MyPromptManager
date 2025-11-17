@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { Save, X, Clock, FileCode } from 'lucide-react'
 import { Button } from '@/components/ui/button'
@@ -7,8 +7,16 @@ import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
 import Breadcrumb from '@/components/layout/Breadcrumb'
-import { templatesAPI } from '@/lib/api'
+import {promptsAPI, templatesAPI} from '@/lib/api'
 import { formatDate } from '@/lib/utils'
 
 export default function TemplateDetail() {
@@ -17,16 +25,20 @@ export default function TemplateDetail() {
   const [template, setTemplate] = useState(null)
   const [versions, setVersions] = useState([])
   const [selectedVersion, setSelectedVersion] = useState(null)
+  const [versionNumber, setVersionNumber] = useState('')
   const [content, setContent] = useState('')
+  const [variables, setVariables] = useState([])
+  const variableHistoryRef = useRef(new Map())
   const [metadata, setMetadata] = useState({
     title: '',
     description: '',
     labels: [],
-    variables: []
   })
   const [newLabel, setNewLabel] = useState('')
   const [saving, setSaving] = useState(false)
   const [loading, setLoading] = useState(true)
+  const [showVersionDialog, setShowVersionDialog] = useState(false)
+  const [newVersionNumber, setNewVersionNumber] = useState('')
 
   useEffect(() => {
     loadTemplate()
@@ -38,12 +50,10 @@ export default function TemplateDetail() {
       setLoading(true)
       const response = await templatesAPI.get(id)
       setTemplate(response)
-      setContent(response.content || '')
       setMetadata({
-        title: response.metadata?.title || '',
-        description: response.metadata?.description || '',
-        labels: response.metadata?.labels || [],
-        variables: response.metadata?.variables || []
+        title: response.title || '',
+        description: response.description || '',
+        labels: response.labels || [],
       })
     } catch (error) {
       console.error('Failed to load template:', error)
@@ -57,7 +67,7 @@ export default function TemplateDetail() {
       const response = await templatesAPI.listVersions(id)
       setVersions(response.versions || [])
       if (response.versions && response.versions.length > 0) {
-        setSelectedVersion(response.versions[0].version_id)
+        await handleVersionSelect(response.versions[0].id)
       }
     } catch (error) {
       console.error('Failed to load versions:', error)
@@ -68,16 +78,32 @@ export default function TemplateDetail() {
     try {
       setSelectedVersion(versionId)
       const versionData = await templatesAPI.getVersion(id, versionId)
-      setContent(versionData.content || '')
-      setMetadata({
-        title: versionData.metadata?.title || '',
-        description: versionData.metadata?.description || '',
-        labels: versionData.metadata?.labels || [],
-        variables: versionData.metadata?.variables || []
-      })
+      const versionContent = versionData.content || ''
+      const versionVariables = (versionData.variables || []).map(variable => ({
+        name: variable.name,
+        description: variable.description || '',
+        default: variable.default || '',
+      }))
+      const syncedVariables = syncVariablesWithContent(versionContent, versionVariables)
+      rememberVariables([...versionVariables, ...syncedVariables])
+      setVariables(syncedVariables)
+      setVersionNumber(versionData.version_number)
+      setContent(versionContent)
+
     } catch (error) {
       console.error('Failed to load version:', error)
     }
+  }
+ 
+  const rememberVariables = (vars = []) => {
+    const history = variableHistoryRef.current
+    vars.forEach(variable => {
+      if (!variable?.name) return
+      history.set(variable.name, {
+        description: variable.description || '',
+        default: variable.default || '',
+      })
+    })
   }
 
   const extractVariables = (text) => {
@@ -86,16 +112,38 @@ export default function TemplateDetail() {
     return [...new Set(matches.map(m => m[1]))]
   }
 
-  const detectedVariables = extractVariables(content)
+  const syncVariablesWithContent = (text, sourceVariables = []) => {
+    const detectedVariables = extractVariables(text)
+    const variableMap = new Map(sourceVariables.map(variable => [variable.name, variable]))
+    return detectedVariables.map(varName => {
+      const existing = variableMap.get(varName) || variableHistoryRef.current.get(varName)
+      return {
+        name: varName,
+        description: existing?.description || '',
+        default: existing?.default || '',
+      }
+    })
+  }
+
+  const updateVariables = (text) => {
+    setVariables(prevVariables => {
+      rememberVariables(prevVariables)
+      const synced = syncVariablesWithContent(text, prevVariables)
+      rememberVariables(synced)
+      return synced
+    })
+  }
 
   const handleVariableChange = (varName, field, value) => {
-    const updatedVars = metadata.variables.filter(v => v.name !== varName)
-    updatedVars.push({
-      name: varName,
-      description: field === 'description' ? value : (metadata.variables.find(v => v.name === varName)?.description || ''),
-      default: field === 'default' ? value : (metadata.variables.find(v => v.name === varName)?.default || '')
+    setVariables(prevVariables => {
+      const updated = prevVariables.map(variable =>
+        variable.name === varName
+          ? { ...variable, [field]: value }
+          : variable
+      )
+      rememberVariables(updated)
+      return updated
     })
-    setMetadata({ ...metadata, variables: updatedVars })
   }
 
   const handleAddLabel = () => {
@@ -112,20 +160,35 @@ export default function TemplateDetail() {
     })
   }
 
+  const handleSaveMetaData = async () => {
+      await templatesAPI.update(id, metadata.title, metadata.labels, metadata.description)
+  }
+
+  const handleOpenVersionDialog = () => {
+    // Suggest next version number
+    const currentVersion = versionNumber || '1.0.0'
+    const versionParts = currentVersion.split('.')
+    if (versionParts.length === 3) {
+      const [major, minor, patch] = versionParts
+      const nextPatch = parseInt(patch) + 1
+      setNewVersionNumber(`${major}.${minor}.${nextPatch}`)
+    } else {
+      setNewVersionNumber('1.0.0')
+    }
+    setShowVersionDialog(true)
+  }
+
   const handleSaveNewVersion = async () => {
+    if (!newVersionNumber.trim()) {
+      alert('Please enter a version number')
+      return
+    }
+
     try {
       setSaving(true)
-      const frontmatter = `---
-title: ${metadata.title}
-description: ${metadata.description}
-labels: ${JSON.stringify(metadata.labels)}
-type: template
-variables: ${JSON.stringify(metadata.variables)}
----
-
-${content}`
-
-      await templatesAPI.update(id, frontmatter)
+      setShowVersionDialog(false)
+      await templatesAPI.createVersions(id, newVersionNumber, content, variables)
+      // Reload data
       await loadTemplate()
       await loadVersions()
       alert('New version saved successfully!')
@@ -180,7 +243,7 @@ ${content}`
             </Button>
             <Button
               className="bg-purple-500 hover:bg-purple-600"
-              onClick={handleSaveNewVersion}
+              onClick={handleOpenVersionDialog}
               disabled={saving}
             >
               <Save className="w-4 h-4 mr-2" />
@@ -195,7 +258,7 @@ ${content}`
           <div className="col-span-8">
             <Card>
               <CardHeader>
-                <CardTitle>Content Editor</CardTitle>
+                <CardTitle>Template Content - {versionNumber}</CardTitle>
                 <CardDescription>
                   Edit template content with {`{{variable}}`} placeholders
                 </CardDescription>
@@ -203,51 +266,22 @@ ${content}`
               <CardContent>
                 <Textarea
                   value={content}
-                  onChange={(e) => setContent(e.target.value)}
+                  onChange={(e) => {
+                    const newContent = e.target.value
+                    setContent(newContent)
+                    updateVariables(newContent)
+                  }}
                   className="min-h-[600px] font-mono text-sm"
                   placeholder="Enter your template content with variables..."
                 />
                 <div className="flex items-center justify-between mt-4 text-xs text-zinc-500">
                   <span>
                     Words: {content.split(/\s+/).filter(w => w.length > 0).length} |
-                    Variables: {detectedVariables.length}
+                    Variables: {variables.length}
                   </span>
                 </div>
               </CardContent>
             </Card>
-
-            {/* Variable Descriptions */}
-            {detectedVariables.length > 0 && (
-              <Card className="mt-6">
-                <CardHeader>
-                  <CardTitle>Variable Descriptions</CardTitle>
-                  <CardDescription>Define descriptions and defaults for detected variables</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-3">
-                    {detectedVariables.map((varName) => (
-                      <div key={varName} className="p-4 bg-purple-50 rounded-lg border border-purple-200">
-                        <div className="font-mono text-sm font-semibold text-purple-700 mb-3">
-                          {`{{${varName}}}`}
-                        </div>
-                        <div className="space-y-2">
-                          <Input
-                            placeholder="Description..."
-                            value={metadata.variables.find(v => v.name === varName)?.description || ''}
-                            onChange={(e) => handleVariableChange(varName, 'description', e.target.value)}
-                          />
-                          <Input
-                            placeholder="Default value..."
-                            value={metadata.variables.find(v => v.name === varName)?.default || ''}
-                            onChange={(e) => handleVariableChange(varName, 'default', e.target.value)}
-                          />
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </CardContent>
-              </Card>
-            )}
           </div>
 
           {/* Secondary Content Area - Right (4/12) */}
@@ -257,6 +291,14 @@ ${content}`
               <CardHeader>
                 <CardTitle>Metadata</CardTitle>
                 <CardDescription>Edit template properties</CardDescription>
+                <Button
+                    className="bg-purple-500 hover:bg-purple-600"
+                    onClick={handleSaveMetaData}
+                    disabled={saving}
+                  >
+                  <Save className="w-4 h-4 mr-2" />
+                    {saving ? 'Saving...' : 'Save MetaData'}
+                  </Button>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div>
@@ -328,29 +370,29 @@ ${content}`
                   ) : (
                     versions.map((version) => (
                       <div
-                        key={version.version_id}
+                        key={version.id}
                         className={`p-3 rounded-lg border cursor-pointer transition-colors ${
-                          selectedVersion === version.version_id
+                          selectedVersion === version.id
                             ? 'bg-purple-50 border-purple-300'
                             : 'bg-white hover:bg-zinc-50'
                         }`}
-                        onClick={() => handleVersionSelect(version.version_id)}
+                        onClick={() => handleVersionSelect(version.id)}
                       >
                         <div className="flex items-center justify-between">
                           <div className="flex-1">
                             <p className="font-mono text-sm font-semibold text-zinc-900">
-                              {version.version_id.substring(0, 8)}
+                              {version.version_number}
                             </p>
                             <p className="text-xs text-zinc-500 mt-1">
-                              {formatDate(version.created_at)}
+                              {version.id.substring(0, 8)} - {formatDate(version.created_at)}
                             </p>
-                            {version.metadata?.variables && (
+                            {version.variables && version.variables.length > 0 && (
                               <p className="text-xs text-purple-600 mt-1">
-                                {version.metadata.variables.length} variables
+                                {version.variables.length} variables
                               </p>
                             )}
                           </div>
-                          {selectedVersion === version.version_id && (
+                          {selectedVersion === version.id && (
                             <Badge variant="success" className="ml-2">Current</Badge>
                           )}
                         </div>
@@ -360,9 +402,90 @@ ${content}`
                 </div>
               </CardContent>
             </Card>
+
+            {/* Variable Descriptions */}
+            {variables.length > 0 && (
+              <Card className="mt-6">
+                <CardHeader>
+                  <CardTitle>Variable Descriptions</CardTitle>
+                  <CardDescription>Define descriptions and defaults for detected variables</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-3">
+                    {variables.map((variable) => (
+                      <div key={variable.name} className="p-4 bg-purple-50 rounded-lg border border-purple-200">
+                        <div className="font-mono text-sm font-semibold text-purple-700 mb-3">
+                          {`{{${variable.name}}}`}
+                        </div>
+                        <div className="space-y-2">
+                          <Input
+                            placeholder="Description..."
+                            value={variable.description || ''}
+                            onChange={(e) => handleVariableChange(variable.name, 'description', e.target.value)}
+                          />
+                          <Input
+                            placeholder="Default value..."
+                            value={variables.find(v => v.name === variable.name)?.default || ''}
+                            onChange={(e) => handleVariableChange(variable.name, 'default', e.target.value)}
+                          />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+            )}
           </div>
         </div>
       </div>
+
+      {/* Version Number Dialog */}
+      <Dialog open={showVersionDialog} onOpenChange={setShowVersionDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Save as New Version</DialogTitle>
+            <DialogDescription>
+              Enter a version number for this new version (e.g., 1.0.0, 2.1.3)
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <div className="grid gap-2">
+              <Label htmlFor="version">Version Number</Label>
+              <Input
+                id="version"
+                value={newVersionNumber}
+                onChange={(e) => setNewVersionNumber(e.target.value)}
+                placeholder="e.g., 1.0.0"
+                autoFocus
+                onKeyPress={(e) => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault()
+                    handleSaveNewVersion()
+                  }
+                }}
+              />
+              <p className="text-sm text-zinc-500">
+                Current version: {versionNumber || 'None'}
+              </p>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setShowVersionDialog(false)}
+            >
+              Cancel
+            </Button>
+            <Button
+              className="bg-purple-500 hover:bg-purple-600"
+              onClick={handleSaveNewVersion}
+              disabled={saving}
+            >
+              {saving ? 'Saving...' : 'Save Version'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

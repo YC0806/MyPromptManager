@@ -1,7 +1,7 @@
 """
 Custom middleware for authentication and audit logging.
 """
-from apps.core.models import AuditLog
+from backend.apps.core.models import AuditLog
 
 
 class AuditLogMiddleware:

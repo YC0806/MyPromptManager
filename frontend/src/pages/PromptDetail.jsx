@@ -7,6 +7,14 @@ import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
 import Breadcrumb from '@/components/layout/Breadcrumb'
 import { promptsAPI } from '@/lib/api'
 import { formatDate } from '@/lib/utils'
@@ -17,6 +25,7 @@ export default function PromptDetail() {
   const [prompt, setPrompt] = useState(null)
   const [versions, setVersions] = useState([])
   const [selectedVersion, setSelectedVersion] = useState(null)
+  const [versionNumber, setVersionNumber] = useState('')
   const [content, setContent] = useState('')
   const [metadata, setMetadata] = useState({
     title: '',
@@ -26,6 +35,8 @@ export default function PromptDetail() {
   const [newLabel, setNewLabel] = useState('')
   const [saving, setSaving] = useState(false)
   const [loading, setLoading] = useState(true)
+  const [showVersionDialog, setShowVersionDialog] = useState(false)
+  const [newVersionNumber, setNewVersionNumber] = useState('')
 
   useEffect(() => {
     loadPrompt()
@@ -37,11 +48,10 @@ export default function PromptDetail() {
       setLoading(true)
       const response = await promptsAPI.get(id)
       setPrompt(response)
-      setContent(response.content || '')
       setMetadata({
-        title: response.metadata?.title || '',
-        description: response.metadata?.description || '',
-        labels: response.metadata?.labels || [],
+        title: response.title || '',
+        description: response.description || '',
+        labels: response.labels || [],
       })
     } catch (error) {
       console.error('Failed to load prompt:', error)
@@ -55,7 +65,7 @@ export default function PromptDetail() {
       const response = await promptsAPI.listVersions(id)
       setVersions(response.versions || [])
       if (response.versions && response.versions.length > 0) {
-        setSelectedVersion(response.versions[0].version_id)
+          await handleVersionSelect(response.versions[0].id)
       }
     } catch (error) {
       console.error('Failed to load versions:', error)
@@ -66,12 +76,8 @@ export default function PromptDetail() {
     try {
       setSelectedVersion(versionId)
       const versionData = await promptsAPI.getVersion(id, versionId)
+      setVersionNumber(versionData.version_number)
       setContent(versionData.content || '')
-      setMetadata({
-        title: versionData.metadata?.title || '',
-        description: versionData.metadata?.description || '',
-        labels: versionData.metadata?.labels || [],
-      })
     } catch (error) {
       console.error('Failed to load version:', error)
     }
@@ -91,18 +97,34 @@ export default function PromptDetail() {
     })
   }
 
+  const handleSaveMetaData = async () => {
+      await promptsAPI.update(id, metadata.title, metadata.labels, metadata.description)
+  }
+
+  const handleOpenVersionDialog = () => {
+    // Suggest next version number
+    const currentVersion = versionNumber || '1.0.0'
+    const versionParts = currentVersion.split('.')
+    if (versionParts.length === 3) {
+      const [major, minor, patch] = versionParts
+      const nextPatch = parseInt(patch) + 1
+      setNewVersionNumber(`${major}.${minor}.${nextPatch}`)
+    } else {
+      setNewVersionNumber('1.0.0')
+    }
+    setShowVersionDialog(true)
+  }
+
   const handleSaveNewVersion = async () => {
+    if (!newVersionNumber.trim()) {
+      alert('Please enter a version number')
+      return
+    }
+
     try {
       setSaving(true)
-      const frontmatter = `---
-title: ${metadata.title}
-description: ${metadata.description}
-labels: ${JSON.stringify(metadata.labels)}
----
-
-${content}`
-
-      await promptsAPI.update(id, frontmatter)
+      setShowVersionDialog(false)
+      await promptsAPI.createVersions(id, newVersionNumber, content)
       // Reload data
       await loadPrompt()
       await loadVersions()
@@ -148,16 +170,13 @@ ${content}`
             </div>
           </div>
           <div className="flex gap-2">
-            <Button
-              variant="outline"
-              onClick={() => navigate('/prompts')}
-            >
+            <Button variant="outline" onClick={() => navigate('/prompts')}>
               <X className="w-4 h-4 mr-2" />
               Close
             </Button>
             <Button
               className="bg-teal-500 hover:bg-teal-600"
-              onClick={handleSaveNewVersion}
+              onClick={handleOpenVersionDialog}
               disabled={saving}
             >
               <Save className="w-4 h-4 mr-2" />
@@ -172,9 +191,9 @@ ${content}`
           <div className="col-span-8">
             <Card>
               <CardHeader>
-                <CardTitle>Content Editor</CardTitle>
+                <CardTitle>Prompt Content - {versionNumber}</CardTitle>
                 <CardDescription>
-                  Edit your prompt content in Markdown (editing will create a new version)
+                  Edit your prompt content in Markdown
                 </CardDescription>
               </CardHeader>
               <CardContent>
@@ -201,6 +220,14 @@ ${content}`
               <CardHeader>
                 <CardTitle>Metadata</CardTitle>
                 <CardDescription>Edit prompt properties</CardDescription>
+                <Button
+                    className="bg-teal-500 hover:bg-teal-600"
+                    onClick={handleSaveMetaData}
+                    disabled={saving}
+                >
+                <Save className="w-4 h-4 mr-2" />
+                    {saving ? 'Saving...' : 'Save MetaData'}
+                </Button>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div>
@@ -279,24 +306,24 @@ ${content}`
                   ) : (
                     versions.map((version) => (
                       <div
-                        key={version.version_id}
+                        key={version.id}
                         className={`p-3 rounded-lg border cursor-pointer transition-colors ${
-                          selectedVersion === version.version_id
+                          selectedVersion === version.id
                             ? 'bg-teal-50 border-teal-300'
                             : 'bg-white hover:bg-zinc-50'
                         }`}
-                        onClick={() => handleVersionSelect(version.version_id)}
+                        onClick={() => handleVersionSelect(version.id)}
                       >
                         <div className="flex items-center justify-between">
                           <div className="flex-1">
                             <p className="font-mono text-sm font-semibold text-zinc-900">
-                              {version.version_id.substring(0, 8)}
+                              {version.version_number.substring(0, 8)}
                             </p>
                             <p className="text-xs text-zinc-500 mt-1">
-                              {formatDate(version.created_at)}
+                              {version.id.substring(0, 8)} - {formatDate(version.created_at)}
                             </p>
                           </div>
-                          {selectedVersion === version.version_id && (
+                          {selectedVersion === version.id && (
                             <Badge variant="success" className="ml-2">Current</Badge>
                           )}
                         </div>
@@ -321,6 +348,54 @@ ${content}`
           </div>
         </div>
       </div>
+
+      {/* Version Number Dialog */}
+      <Dialog open={showVersionDialog} onOpenChange={setShowVersionDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Save as New Version</DialogTitle>
+            <DialogDescription>
+              Enter a version number for this new version (e.g., 1.0.0, 2.1.3)
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <div className="grid gap-2">
+              <Label htmlFor="version">Version Number</Label>
+              <Input
+                id="version"
+                value={newVersionNumber}
+                onChange={(e) => setNewVersionNumber(e.target.value)}
+                placeholder="e.g., 1.0.0"
+                autoFocus
+                onKeyPress={(e) => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault()
+                    handleSaveNewVersion()
+                  }
+                }}
+              />
+              <p className="text-sm text-zinc-500">
+                Current version: {versionNumber || 'None'}
+              </p>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setShowVersionDialog(false)}
+            >
+              Cancel
+            </Button>
+            <Button
+              className="bg-teal-500 hover:bg-teal-600"
+              onClick={handleSaveNewVersion}
+              disabled={saving}
+            >
+              {saving ? 'Saving...' : 'Save Version'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

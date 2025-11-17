@@ -244,5 +244,5 @@
 ## 更多帮助
 
 - GitHub Issues: [提交问题](https://github.com/your-repo/issues)
-- 文档: [完整文档](../README.md)
+- 文档: [完整文档](../backend/README.md)
 - 更新日志: [查看更新](./README.md#更新日志)

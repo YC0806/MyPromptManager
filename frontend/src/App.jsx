@@ -12,8 +12,6 @@ import TemplateCreate from './pages/TemplateCreate'
 import ChatsList from './pages/ChatsList'
 import ChatDetail from './pages/ChatDetail'
 import ChatCreate from './pages/ChatCreate'
-import AIHistoriesList from './pages/AIHistoriesList'
-import AIHistoryDetail from './pages/AIHistoryDetail'
 import Releases from './pages/Releases'
 import Timeline from './pages/Timeline'
 import RepoAdvanced from './pages/RepoAdvanced'
@@ -45,8 +43,6 @@ function App() {
               <Route path="/chats" element={<ChatsList />} />
               <Route path="/chats/create" element={<ChatCreate />} />
               <Route path="/chats/:id" element={<ChatDetail />} />
-              <Route path="/ai-histories" element={<AIHistoriesList />} />
-              <Route path="/ai-histories/:id" element={<AIHistoryDetail />} />
               <Route path="/releases" element={<Releases />} />
               <Route path="/timeline" element={<Timeline />} />
               <Route path="/repo" element={<RepoAdvanced />} />

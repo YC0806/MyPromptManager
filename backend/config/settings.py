@@ -4,9 +4,14 @@ Django settings for MyPromptManager project.
 
 from pathlib import Path
 import os
+import sys
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
+# Ensure repo root is on PYTHONPATH so `backend.*` imports work when running from backend dir.
+PROJECT_ROOT = BASE_DIR.parent
+if str(PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(PROJECT_ROOT))
 
 # SECURITY WARNING: keep the secret key used in production secret!
 SECRET_KEY = os.environ.get('DJANGO_SECRET_KEY', 'django-insecure-change-this-in-production')
@@ -25,8 +30,8 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'django.contrib.staticfiles',
     'rest_framework',
-    'apps.core',
-    'apps.api',  # Unified API (replaces api_simple, api_detail, api_common)
+    'backend.apps.core',
+    'backend.apps.api',  # Unified API (replaces api_simple, api_detail, api_common)
 ]
 
 MIDDLEWARE = [
@@ -108,7 +113,7 @@ REST_FRAMEWORK = {
     'DEFAULT_PARSER_CLASSES': [
         'rest_framework.parsers.JSONParser',
     ],
-    'EXCEPTION_HANDLER': 'apps.core.exceptions.custom_exception_handler',
+    'EXCEPTION_HANDLER': 'backend.apps.core.exceptions.custom_exception_handler',
 }
 
 # File Storage settings (previously Git Repository)

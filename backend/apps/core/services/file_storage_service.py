@@ -2,22 +2,19 @@
 File-based storage service for prompts, templates, and chats.
 Replaces Git-based storage with file-based versioning system.
 """
-import os
 import json
 import yaml
 import shutil
 from pathlib import Path
 from typing import Optional, List, Dict, Tuple, Union
 import datetime
-import hashlib
 
-from filelock import FileLock
 from django.conf import settings
 
-from apps.core.exceptions import ResourceNotFoundError, ConflictError, ValidationError
-from apps.core.utils.id_generator import generate_ulid
-from apps.core.domain.metadata import Metadata, VersionSummary
-from apps.core.domain.version import VersionData, TemplateVersionData, TemplateVariable
+from backend.apps.core.exceptions import ResourceNotFoundError, ValidationError
+from backend.apps.core.utils.id_generator import generate_ulid
+from backend.apps.core.domain.itemmetadata import ItemMetadata, VersionSummary
+from backend.apps.core.domain.version import VersionData, TemplateVersionData, TemplateVariable
 
 
 class FileStorageService:
@@ -95,7 +92,7 @@ class FileStorageService:
         head_file.parent.mkdir(parents=True, exist_ok=True)
         head_file.write_text(f"versions/{version_filename}")
 
-    def load_metadata(self, item_type: str, item_id: str) -> Metadata:
+    def load_metadata(self, item_type: str, item_id: str) -> ItemMetadata:
         """
         Load metadata from YAML file.
 
@@ -112,9 +109,9 @@ class FileStorageService:
             raise ResourceNotFoundError(f"{item_type.capitalize()} {item_id} not found")
 
         data = self._read_yaml(yaml_path)
-        return Metadata.from_dict(data)
+        return ItemMetadata.from_dict(data)
     
-    def create_version(self, metadata: Metadata, version_number: str, content: str, variables: Optional[List[TemplateVariable]]) -> str:
+    def create_version(self, metadata: ItemMetadata, version_number: str, content: str, variables: Optional[List[TemplateVariable]]) -> str:
         """
         Create a new version of an existing item.
 
@@ -189,7 +186,7 @@ class FileStorageService:
         return version_id
     
 
-    def create_item(self, item_type: str, metadata: Metadata, content: str, variables: Optional[List[TemplateVariable]]) -> Tuple[str, str]:
+    def create_item(self, item_type: str, metadata: ItemMetadata, content: str, variables: Optional[List[TemplateVariable]]) -> Tuple[str, str]:
         """
         Create a new item (prompt/template).
 
@@ -197,7 +194,7 @@ class FileStorageService:
             item_type: 'prompt' or 'template'
             metadata: Item metadata (stored in YAML)
             content: Item content (markdown body)
-
+            variables: Item variables
         Returns:
             Tuple of (item_id, version_id)
         """
@@ -212,14 +209,46 @@ class FileStorageService:
         versions_dir.mkdir(parents=True, exist_ok=True)
 
         # Create initial version
-        version_id = self.create_version(metadata, "inital", content, variables)
+        version_id = self.create_version(metadata, "initial", content, variables)
 
         return item_id, version_id
 
 
+    def update_item(self, item_type: str, item_id: str, title:str, labels: List[str], description: str, author:str) -> bool:
+        """
+        Update an existing item.
+
+        Args:
+            item_type: 'prompt' or 'template'
+            item_id: Item id
+            title: Item title
+            labels: Item labels
+            description: Item description
+            author: Item author
+        Returns:
+            Boolean indicating whether item was successfully updated
+        """
+        item_dir = self._get_item_directory(item_type, item_id)
+        if not item_dir.exists():
+            raise ResourceNotFoundError(f"{item_type.capitalize()} {item_id} not found")
+
+        metadata = self.load_metadata(item_type, item_id)
+
+        metadata.title = title
+        metadata.labels = labels
+        metadata.description = description
+        metadata.updated_at = datetime.datetime.now(datetime.timezone.utc).isoformat()
+        metadata.author = author
+
+        # Write full metadata to YAML
+        yaml_path = item_dir / f"{item_type}.yaml"
+        self._write_yaml(yaml_path, metadata.__dict__())
+
+        return True
+
 
     def read_version(self, item_type: str, item_id: str,
-                    version_id: Optional[str] = None) -> Tuple[Metadata,  Union[VersionData, TemplateVersionData]]:
+                    version_id: Optional[str] = None) -> None | VersionData | TemplateVersionData:
         """
         Read a specific version or HEAD.
 
@@ -273,7 +302,8 @@ class FileStorageService:
             List of version summaries
         """
         metadata = self.load_metadata(item_type, item_id)
-        return metadata.versions
+        versions = sorted(metadata.versions, key=lambda v: v.created_at, reverse=True)
+        return versions
 
     def delete_item(self, item_type: str, item_id: str):
         """
@@ -412,7 +442,7 @@ class FileStorageService:
 
         raise ResourceNotFoundError(f"Chat {chat_id} not found")
 
-    def list_all_items(self, item_type: str) -> List[Metadata]:
+    def list_all_items(self, item_type: str) -> List[ItemMetadata]:
         """
         List all items of a specific type.
 
@@ -430,7 +460,7 @@ class FileStorageService:
             if item_dir.is_dir():
                 yaml_path = item_dir / f"{item_type}.yaml"
                 if yaml_path.exists():
-                    items.append(Metadata.from_dict(self._read_yaml(yaml_path)))
+                    items.append(ItemMetadata.from_dict(self._read_yaml(yaml_path)))
 
         return items
 

@@ -6,13 +6,12 @@ import json
 from pathlib import Path
 from typing import List, Dict, Optional
 from datetime import datetime
-import hashlib
 
 from filelock import FileLock
 from django.conf import settings
 
-from apps.core.exceptions import IndexLockError, ValidationError
-from apps.core.utils.frontmatter import parse_frontmatter, extract_metadata_fields
+from backend.apps.core.exceptions import IndexLockError
+from backend.apps.core.utils.frontmatter import extract_metadata_fields
 
 
 class IndexService:
