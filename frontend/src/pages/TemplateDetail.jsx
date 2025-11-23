@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { Save, X, Clock, FileCode } from 'lucide-react'
+import { Save, X, Clock, FileCode, History } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -248,6 +248,11 @@ export default function TemplateDetail() {
             >
               <Save className="w-4 h-4 mr-2" />
               {saving ? 'Saving...' : 'Save as New Version'}
+            </Button>
+
+            <Button variant="outline" onClick={() => navigate(`/templates/${id}/timeline`)}>
+              <History className="w-4 h-4 mr-2" />
+              Timeline
             </Button>
           </div>
         </div>

@@ -11,6 +11,7 @@ from backend.apps.core.services.file_storage_service import FileStorageService
 from backend.apps.core.exceptions import ValidationError, BadRequestError
 from backend.apps.core.domain.itemmetadata import ItemMetadata
 from backend.apps.core.domain.version import TemplateVariable
+from backend.apps.core.domain.chatmetadata import ChatMetadata
 
 # ============================================================================
 # Prompts
@@ -382,135 +383,164 @@ class ChatsListView(APIView):
 
         # Apply filters if provided
         provider = request.query_params.get('provider')
-        if provider:
-            chats = [c for c in chats if c.get('provider', '').lower() == provider.lower()]
-
-        # Add turn_count to each chat if not present
-        for chat in chats:
-            if 'turn_count' not in chat and 'messages' in chat:
-                turn_count = sum(1 for msg in chat['messages'] if msg.get('role') == 'user')
-                chat['turn_count'] = turn_count
-
-        # Sort by updated_at descending
-        chats.sort(key=lambda x: x.get('updated_at', ''), reverse=True)
-
+        labels = request.query_params.getlist('labels')
         limit = int(request.query_params.get('limit', 100))
 
+        if provider:
+            chats = [c for c in chats if c.provider and c.provider.lower() == provider.lower()]
+
+        if labels:
+            chats = [c for c in chats if all(label in c.labels for label in labels)]
+
+        # Sort by updated_at descending
+        chats.sort(key=lambda x: x.updated_at or x.created_at or "", reverse=True)
+
         return Response({
-            'chats': chats[:limit],
+            'items': [c.to_summary().__dict__() for c in chats[:limit]],
             'count': len(chats[:limit]),
             'total': len(chats),
         })
 
     def post(self, request):
         """Create a new chat (or update if provider + conversation_id exists)."""
-        chat_data = request.data
+        title = request.data.get('title')
+        description = request.data.get('description', '')
+        labels = request.data.get('labels', request.data.get('tags', []))
+        provider = request.data.get('provider')
+        model = request.data.get('model')
+        conversation_id = request.data.get('conversation_id')
+        messages = request.data.get('messages', [])
+        author = request.data.get('author', 'system')
+        now = datetime.datetime.now(datetime.timezone.utc).isoformat()
 
-        # Validate required fields
-        if not chat_data.get('title'):
-            raise ValidationError("title is required")
+        if not title:
+            raise BadRequestError("title is required")
 
         storage = FileStorageService()
 
         # Check for existing chat by provider + conversation_id (for browser extension deduplication)
-        if chat_data.get('provider') and chat_data.get('conversation_id'):
-            existing = storage.find_chat_by_conversation(
-                chat_data['provider'],
-                chat_data['conversation_id']
-            )
+        if provider and conversation_id:
+            existing = storage.find_chat_by_conversation(provider, conversation_id)
 
             if existing:
                 # Update existing chat
-                chat_id = existing['id']
-                chat_data['id'] = chat_id
-                chat_data['created_at'] = existing.get('created_at')
-                chat_data['updated_at'] = datetime.datetime.now(datetime.timezone.utc).isoformat()
-                storage.update_chat(chat_id, chat_data)
+                existing.title = title
+                existing.description = description
+                existing.labels = labels
+                existing.messages = messages
+                existing.updated_at = now
+                existing.model = model or existing.model
+                storage.save_chat(existing)
 
                 return Response({
-                    'id': chat_id,
-                    'updated_at': chat_data['updated_at'],
+                    'success': True,
+                    'id': existing.id,
+                    'updated_at': now,
                     'message': 'Chat updated',
                 })
 
         # Create new chat
-        chat_data['created_at'] = chat_data.get('created_at') or datetime.datetime.now(datetime.timezone.utc).isoformat()
-        chat_data['updated_at'] = datetime.datetime.now(datetime.timezone.utc).isoformat()
+        chat = ChatMetadata(
+            id='',
+            title=title,
+            type='chat',
+            labels=labels,
+            description=description,
+            updated_at=now,
+            created_at=request.data.get('created_at') or now,
+            author=author,
+            provider=provider,
+            model=model,
+            conversation_id=conversation_id,
+            messages=messages,
+        )
 
-        # Ensure messages array exists
-        if 'messages' not in chat_data:
-            chat_data['messages'] = []
-
-        chat_id = storage.create_chat(chat_data)
-
-        metadata = {
-            'id': chat_id,
-            'title': chat_data.get('title', ''),
-            'description': chat_data.get('description', ''),
-            'labels': chat_data.get('tags', []),
-            'author': 'system',
-            'created_at': chat_data['created_at'],
-            'type': 'chat',
-        }
-        title_slug = chat_data.get('title', chat_id).lower().replace(' ', '-')[:50]
+        chat_id = storage.create_chat(chat.__dict__())
 
         return Response({
+            'success': True,
             'id': chat_id,
-            'created_at': chat_data['created_at'],
-            'message': 'Chat created',
+            'created_at': chat.created_at,
         }, status=status.HTTP_201_CREATED)
 
 
 class ChatDetailView(APIView):
     """
-    GET /v1/chats/{id} - Get chat
-    PUT /v1/chats/{id} - Update chat
+    GET /v1/chats/{id} - Get chat metadata
+    PUT /v1/chats/{id} - Update chat metadata
     DELETE /v1/chats/{id} - Delete chat
     """
 
     def get(self, request, chat_id):
-        """Get chat details."""
+        """Get chat metadata."""
         storage = FileStorageService()
-        chat_data = storage.read_chat(chat_id)
+        chat = storage.load_chat(chat_id)
 
-        # Calculate conversation turns if not already present
-        if 'turn_count' not in chat_data and 'messages' in chat_data:
-            # Count user messages as turn count (each user-assistant pair is 1 turn)
-            turn_count = sum(1 for msg in chat_data['messages'] if msg.get('role') == 'user')
-            chat_data['turn_count'] = turn_count
-
-        return Response(chat_data)
+        return Response(chat.to_summary().__dict__())
 
     def put(self, request, chat_id):
-        """Update chat."""
-        chat_data = request.data
-        chat_data['id'] = chat_id
+        """Update chat metadata."""
+        title = request.data.get('title')
+        labels = request.data.get('labels', [])
+        description = request.data.get('description', '')
+        author = request.data.get('author', 'You')
 
         storage = FileStorageService()
-        storage.update_chat(chat_id, chat_data)
+        chat = storage.load_chat(chat_id)
 
-        metadata = {
-            'id': chat_id,
-            'title': chat_data.get('title', ''),
-            'description': chat_data.get('description', ''),
-            'labels': chat_data.get('tags', []),
-            'author': 'system',
-            'created_at': chat_data.get('created_at', ''),
-            'updated_at': chat_data.get('updated_at', ''),
-            'type': 'chat',
-        }
+        chat.title = title or chat.title
+        chat.labels = labels
+        chat.description = description
+        chat.author = author
+        chat.updated_at = datetime.datetime.now(datetime.timezone.utc).isoformat()
 
-        return Response({
-            'id': chat_id,
-            'updated_at': chat_data.get('updated_at'),
-        })
+        storage.save_chat(chat)
+
+        return JsonResponse({'success': True, 'id': chat_id}, status=status.HTTP_200_OK)
 
     def delete(self, request, chat_id):
         """Delete chat."""
         storage = FileStorageService()
         storage.delete_chat(chat_id)
 
-        return Response(status=status.HTTP_204_NO_CONTENT)
+        return JsonResponse({'success': True, 'id': chat_id}, status=status.HTTP_200_OK)
+
+
+class ChatMessagesView(APIView):
+    """
+    GET /v1/chats/{id}/messages - Get chat messages
+    PUT /v1/chats/{id}/messages - Update chat messages
+    """
+
+    def get(self, request, chat_id):
+        """Get chat with full messages."""
+        storage = FileStorageService()
+        chat = storage.load_chat(chat_id)
+
+        return JsonResponse({
+            'chat_id': chat_id,
+            'messages': chat.messages,
+            'turn_count': chat.turn_count,
+        }, status=status.HTTP_200_OK)
+
+    def put(self, request, chat_id):
+        """Update chat messages."""
+        messages = request.data.get('messages', [])
+
+        storage = FileStorageService()
+        chat = storage.load_chat(chat_id)
+
+        chat.messages = messages
+        chat.turn_count = sum(1 for msg in messages if msg.get('role') == 'user')
+        chat.updated_at = datetime.datetime.now(datetime.timezone.utc).isoformat()
+
+        storage.save_chat(chat)
+
+        return JsonResponse({
+            'success': True,
+            'id': chat_id,
+            'turn_count': chat.turn_count,
+        }, status=status.HTTP_200_OK)
 
 
 # ============================================================================

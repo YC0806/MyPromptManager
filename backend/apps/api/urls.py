@@ -20,6 +20,7 @@ urlpatterns = [
     # Chats (includes AI conversation histories from browser extension)
     path('chats', views.ChatsListView.as_view(), name='chats-list'),
     path('chats/<str:chat_id>', views.ChatDetailView.as_view(), name='chat-detail'),
+    path('chats/<str:chat_id>/messages', views.ChatMessagesView.as_view(), name='chat-messages'),
 
     # Search (from common API)
     path('search', views.SearchView.as_view(), name='search'),

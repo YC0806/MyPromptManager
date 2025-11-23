@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { Save, Send, History, User, Bot } from 'lucide-react'
+import { Save, Send, History, User, Bot, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -20,16 +20,18 @@ export default function ChatDetail() {
     id: '',
     title: '',
     description: '',
-    tags: [],
+    labels: [],
     messages: [],
     created_at: '',
     updated_at: '',
   })
+  const [newLabel, setNewLabel] = useState('')
   const [saving, setSaving] = useState(false)
   const [showPublishModal, setShowPublishModal] = useState(false)
 
   useEffect(() => {
     loadChat()
+    loadMessages()
   }, [id])
 
   const loadChat = async () => {
@@ -43,11 +45,20 @@ export default function ChatDetail() {
         id: id,
         title: 'Sample Chat',
         description: 'A sample chat conversation',
-        tags: ['demo'],
+        labels: ['demo'],
         messages: [],
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
       })
+    }
+  }
+
+  const loadMessages = async () => {
+    try {
+      const response = await chatsAPI.getMessages(id)
+      setChatData((prev) => ({ ...prev, messages: response.messages || [] }))
+    } catch (error) {
+      console.error('Failed to load messages:', error)
     }
   }
 
@@ -61,6 +72,20 @@ export default function ChatDetail() {
     } finally {
       setSaving(false)
     }
+  }
+
+  const handleAddLabel = () => {
+    if (newLabel.trim() && !chatData.labels.includes(newLabel.trim())) {
+      setChatData({ ...chatData, labels: [...chatData.labels, newLabel.trim()] })
+      setNewLabel('')
+    }
+  }
+
+  const handleRemoveLabel = (labelToRemove) => {
+    setChatData({
+      ...chatData,
+      labels: chatData.labels.filter(label => label !== labelToRemove)
+    })
   }
 
   const breadcrumbItems = [
@@ -79,8 +104,8 @@ export default function ChatDetail() {
           <div>
             <h1 className="text-3xl font-bold text-zinc-900">{chatData.title}</h1>
             <div className="flex gap-2 mt-2">
-              {chatData.tags?.map((tag, idx) => (
-                <Badge key={idx} variant="outline">{tag}</Badge>
+              {chatData.labels?.map((label, idx) => (
+                <Badge key={idx} variant="outline">{label}</Badge>
               ))}
             </div>
           </div>
@@ -158,16 +183,40 @@ export default function ChatDetail() {
                   />
                 </div>
 
-                {/* Tags */}
+                {/* Labels */}
                 <div>
-                  <Label htmlFor="tags">Tags</Label>
-                  <Input
-                    id="tags"
-                    value={chatData.tags?.join(', ') || ''}
-                    onChange={(e) => setChatData({ ...chatData, tags: e.target.value.split(',').map(t => t.trim()).filter(Boolean) })}
-                    placeholder="tag1, tag2, tag3"
-                  />
-                  <p className="text-xs text-zinc-500 mt-1">Comma-separated tags</p>
+                  <Label>Labels</Label>
+                  <div className="flex gap-2 mt-2">
+                    <Input
+                      value={newLabel}
+                      onChange={(e) => setNewLabel(e.target.value)}
+                      placeholder="Add label..."
+                      onKeyPress={(e) => {
+                        if (e.key === 'Enter') {
+                          e.preventDefault()
+                          handleAddLabel()
+                        }
+                      }}
+                    />
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={handleAddLabel}
+                    >
+                      Add
+                    </Button>
+                  </div>
+                  <div className="flex gap-2 flex-wrap mt-3">
+                    {chatData.labels?.map((label, idx) => (
+                      <Badge key={idx} variant="secondary" className="cursor-pointer">
+                        {label}
+                        <X
+                          className="w-3 h-3 ml-1"
+                          onClick={() => handleRemoveLabel(label)}
+                        />
+                      </Badge>
+                    ))}
+                  </div>
                 </div>
 
                 {/* Stats */}

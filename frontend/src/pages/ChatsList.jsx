@@ -27,7 +27,7 @@ import {
 } from '@/components/ui/select'
 import Breadcrumb from '@/components/layout/Breadcrumb'
 import useStore from '@/store/useStore'
-import { searchAPI } from '@/lib/api'
+import { chatsAPI } from '@/lib/api'
 import { formatDate, getLabelColor } from '@/lib/utils'
 
 export default function ChatsList() {
@@ -52,8 +52,7 @@ export default function ChatsList() {
   const loadChats = async () => {
     try {
       setLoading(true)
-      const response = await searchAPI.search({
-        type: 'chat',
+      const response = await chatsAPI.list({
         labels: filters.label || undefined,
         author: filters.author || undefined,
       })
@@ -106,7 +105,10 @@ export default function ChatsList() {
         {/* Page Header */}
         <div className="flex items-center justify-between mb-8">
           <div>
-            <h1 className="text-3xl font-bold text-zinc-900">Chats</h1>
+            <div className="flex items-center gap-3">
+              <MessageSquare className="w-8 h-8 text-teal-500" />
+              <h1 className="text-3xl font-bold text-zinc-900">Chats</h1>
+            </div>
             <p className="text-zinc-600 mt-1">Manage your AI conversation history</p>
           </div>
           <Button

@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Save, X, Upload } from 'lucide-react'
+import { Save, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -16,8 +16,10 @@ export default function ChatCreate() {
     title: '',
     description: '',
     labels: [],
+    provider: '',
+    model: '',
   })
-  const [jsonContent, setJsonContent] = useState('')
+  const [messagesJson, setMessagesJson] = useState('')
   const [newLabel, setNewLabel] = useState('')
   const [saving, setSaving] = useState(false)
   const [parseError, setParseError] = useState('')
@@ -37,14 +39,17 @@ export default function ChatCreate() {
   }
 
   const handleJsonChange = (value) => {
-    setJsonContent(value)
+    setMessagesJson(value)
     setParseError('')
 
-    // Try to parse and validate
     if (value.trim()) {
       try {
-        JSON.parse(value)
-        setParseError('')
+        const parsed = JSON.parse(value)
+        if (!Array.isArray(parsed)) {
+          setParseError('Messages must be an array')
+        } else {
+          setParseError('')
+        }
       } catch (error) {
         setParseError('Invalid JSON format')
       }
@@ -52,29 +57,34 @@ export default function ChatCreate() {
   }
 
   const handleSave = async () => {
-    try {
-      // Validate JSON
-      let chatData
+    if (!metadata.title.trim()) {
+      alert('Please enter a title')
+      return
+    }
+
+    let messages = []
+    if (messagesJson.trim()) {
       try {
-        chatData = JSON.parse(jsonContent)
+        messages = JSON.parse(messagesJson)
+        if (!Array.isArray(messages)) {
+          alert('Messages must be an array')
+          return
+        }
       } catch (error) {
         alert('Invalid JSON format. Please check your input.')
         return
       }
+    }
 
+    try {
       setSaving(true)
-
-      // Combine metadata with chat data
-      const finalData = {
-        ...metadata,
-        ...chatData,
-        // Metadata takes precedence
-        title: metadata.title || chatData.title || 'Untitled Chat',
-        description: metadata.description || chatData.description || '',
-        labels: metadata.labels.length > 0 ? metadata.labels : (chatData.labels || chatData.tags || []),
-      }
-
-      const response = await chatsAPI.create(finalData)
+      const response = await chatsAPI.create(metadata.title, {
+        description: metadata.description,
+        labels: metadata.labels,
+        provider: metadata.provider || undefined,
+        model: metadata.model || undefined,
+        messages: messages,
+      })
       navigate(`/chats/${response.id}`)
     } catch (error) {
       console.error('Failed to create chat:', error)
@@ -90,22 +100,16 @@ export default function ChatCreate() {
     { label: 'Create New Chat' },
   ]
 
-  const exampleJson = `{
-  "title": "My AI Conversation",
-  "description": "A conversation about...",
-  "messages": [
-    {
-      "role": "user",
-      "content": "Hello, how are you?",
-      "timestamp": "2024-01-01T12:00:00Z"
-    },
-    {
-      "role": "assistant",
-      "content": "I'm doing well, thank you!",
-      "timestamp": "2024-01-01T12:00:05Z"
-    }
-  ]
-}`
+  const exampleMessages = `[
+  {
+    "role": "user",
+    "content": "Hello, how are you?"
+  },
+  {
+    "role": "assistant",
+    "content": "I'm doing well, thank you!"
+  }
+]`
 
   return (
     <div className="min-h-screen">
@@ -116,7 +120,7 @@ export default function ChatCreate() {
         <div className="flex items-center justify-between mb-6">
           <div>
             <h1 className="text-3xl font-bold text-zinc-900">Create New Chat</h1>
-            <p className="text-zinc-600 mt-1">Import chat conversation from JSON format</p>
+            <p className="text-zinc-600 mt-1">Import chat messages in JSON format</p>
           </div>
           <div className="flex gap-2">
             <Button variant="outline" onClick={() => navigate('/chats')}>
@@ -126,7 +130,7 @@ export default function ChatCreate() {
             <Button
               className="bg-teal-500 hover:bg-teal-600"
               onClick={handleSave}
-              disabled={saving || !metadata.title.trim() || !jsonContent.trim() || !!parseError}
+              disabled={saving || !metadata.title.trim() || !!parseError}
             >
               <Save className="w-4 h-4 mr-2" />
               {saving ? 'Creating...' : 'Create Chat'}
@@ -136,32 +140,32 @@ export default function ChatCreate() {
 
         {/* Content */}
         <div className="grid grid-cols-12 gap-6">
-          {/* JSON Editor (Main - 8/12) */}
+          {/* Messages JSON Editor (Main - 8/12) */}
           <div className="col-span-8">
             <Card>
               <CardHeader>
-                <CardTitle>Chat Content (JSON Format)</CardTitle>
+                <CardTitle>Messages (JSON Array)</CardTitle>
                 <CardDescription>
-                  Paste or write your chat data in JSON format
+                  Paste or write your messages array in JSON format
                 </CardDescription>
               </CardHeader>
               <CardContent>
                 <Textarea
-                  value={jsonContent}
+                  value={messagesJson}
                   onChange={(e) => handleJsonChange(e.target.value)}
                   className={`min-h-[500px] font-mono text-sm ${
                     parseError ? 'border-red-500' : ''
                   }`}
-                  placeholder={exampleJson}
+                  placeholder={exampleMessages}
                 />
                 {parseError && (
                   <p className="text-red-500 text-sm mt-2">{parseError}</p>
                 )}
                 <div className="flex items-center justify-between mt-4 text-xs text-zinc-500">
                   <span>
-                    {jsonContent.length > 0 && !parseError ? '✓ Valid JSON' : parseError ? '✗ Invalid JSON' : ''}
+                    {messagesJson.length > 0 && !parseError ? '✓ Valid JSON' : parseError ? '✗ Invalid' : ''}
                   </span>
-                  <span>Characters: {jsonContent.length}</span>
+                  <span>Characters: {messagesJson.length}</span>
                 </div>
               </CardContent>
             </Card>
@@ -173,11 +177,10 @@ export default function ChatCreate() {
               </CardHeader>
               <CardContent>
                 <pre className="text-xs font-mono text-zinc-700 whitespace-pre-wrap">
-                  {exampleJson}
+                  {exampleMessages}
                 </pre>
                 <div className="mt-4 text-sm text-zinc-600 space-y-1">
-                  <p>• <code className="bg-zinc-200 px-1 rounded">messages</code>: Array of message objects</p>
-                  <p>• <code className="bg-zinc-200 px-1 rounded">role</code>: "user" or "assistant"</p>
+                  <p>• <code className="bg-zinc-200 px-1 rounded">role</code>: "user", "assistant", or "system"</p>
                   <p>• <code className="bg-zinc-200 px-1 rounded">content</code>: Message text</p>
                   <p>• <code className="bg-zinc-200 px-1 rounded">timestamp</code>: ISO date string (optional)</p>
                 </div>
@@ -242,6 +245,26 @@ export default function ChatCreate() {
                     ))}
                   </div>
                 </div>
+
+                <div>
+                  <Label htmlFor="provider">Provider</Label>
+                  <Input
+                    id="provider"
+                    value={metadata.provider}
+                    onChange={(e) => setMetadata({ ...metadata, provider: e.target.value })}
+                    placeholder="e.g., OpenAI, Claude..."
+                  />
+                </div>
+
+                <div>
+                  <Label htmlFor="model">Model</Label>
+                  <Input
+                    id="model"
+                    value={metadata.model}
+                    onChange={(e) => setMetadata({ ...metadata, model: e.target.value })}
+                    placeholder="e.g., gpt-4, claude-3..."
+                  />
+                </div>
               </CardContent>
             </Card>
 
@@ -250,10 +273,9 @@ export default function ChatCreate() {
                 <CardTitle className="text-blue-900">Tips</CardTitle>
               </CardHeader>
               <CardContent className="text-sm text-blue-800 space-y-2">
-                <p>• Import conversations from ChatGPT, Claude, or other AI tools</p>
-                <p>• Ensure JSON is properly formatted</p>
-                <p>• Include message role (user/assistant)</p>
-                <p>• Add timestamps for better tracking</p>
+                <p>• Only paste the messages array, not the full chat object</p>
+                <p>• Title and other metadata are entered in the sidebar</p>
+                <p>• Messages can be empty to create a placeholder chat</p>
               </CardContent>
             </Card>
           </div>

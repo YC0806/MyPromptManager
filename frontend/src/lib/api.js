@@ -255,13 +255,16 @@ export const templatesAPI = {
 export const chatsAPI = {
   /**
    * List all chats
-   * @param {Object} params - Query parameters (provider, limit)
-   * @returns {Promise<{chats: Array, count: number, total: number}>}
+   * @param {Object} params - Query parameters (provider, labels, limit)
+   * @returns {Promise<{items: Array, count: number, total: number}>}
    */
   list: async (params = {}) => {
     const query = new URLSearchParams();
     if (params.provider) {
       query.append('provider', params.provider);
+    }
+    if (params.labels) {
+      params.labels.forEach(label => query.append('labels', label));
     }
     if (params.limit) {
       query.append('limit', params.limit);
@@ -272,9 +275,9 @@ export const chatsAPI = {
   },
 
   /**
-   * Get chat by ID
+   * Get chat metadata by ID
    * @param {string} id - Chat ID
-   * @returns {Promise<Object>} Chat data
+   * @returns {Promise<{id: string, title: string, type: string, labels: Array, description: string, updated_at: string, created_at: string, author: string, provider: string, model: string, turn_count: number}>}
    */
   get: async (id) => {
     return apiFetch(`${API_BASE}/chats/${id}`);
@@ -282,37 +285,62 @@ export const chatsAPI = {
 
   /**
    * Create a new chat (or update if conversation_id matches)
-   * @param {Object} chatData - Chat data (title, description, provider, conversation_id, messages, tags, created_at)
-   * @returns {Promise<{id: string, created_at: string, message: string}>} or {Promise<{id: string, updated_at: string, message: string}>} if updating
+   * @param {string} title - Chat title
+   * @param {Object} options - Optional parameters (description, labels, provider, model, conversation_id, messages, author)
+   * @returns {Promise<{success: boolean, id: string, created_at: string}>}
    */
-  create: async (chatData) => {
+  create: async (title, options = {}) => {
     return apiFetch(`${API_BASE}/chats`, {
       method: 'POST',
-      body: JSON.stringify(chatData),
+      body: JSON.stringify({ title, ...options }),
     });
   },
 
   /**
-   * Update a chat
+   * Update chat metadata
    * @param {string} id - Chat ID
-   * @param {Object} chatData - Updated chat data (title, description, messages, tags, etc.)
-   * @returns {Promise<{id: string, updated_at: string}>}
+   * @param {string} title - Chat title
+   * @param {Array} labels - Labels (optional)
+   * @param {string} description - Description (optional)
+   * @returns {Promise<{success: boolean, id: string}>}
    */
-  update: async (id, chatData) => {
+  update: async (id, title, labels, description) => {
     return apiFetch(`${API_BASE}/chats/${id}`, {
       method: 'PUT',
-      body: JSON.stringify(chatData),
+      body: JSON.stringify({ title, labels, description }),
     });
   },
 
   /**
    * Delete a chat
    * @param {string} id - Chat ID
-   * @returns {Promise<null>}
+   * @returns {Promise<{success: boolean, id: string}>}
    */
   delete: async (id) => {
     return apiFetch(`${API_BASE}/chats/${id}`, {
       method: 'DELETE',
+    });
+  },
+
+  /**
+   * Get chat messages
+   * @param {string} id - Chat ID
+   * @returns {Promise<{chat_id: string, messages: Array, turn_count: number}>}
+   */
+  getMessages: async (id) => {
+    return apiFetch(`${API_BASE}/chats/${id}/messages`);
+  },
+
+  /**
+   * Update chat messages
+   * @param {string} id - Chat ID
+   * @param {Array} messages - Messages array
+   * @returns {Promise<{success: boolean, id: string, turn_count: number}>}
+   */
+  updateMessages: async (id, messages) => {
+    return apiFetch(`${API_BASE}/chats/${id}/messages`, {
+      method: 'PUT',
+      body: JSON.stringify({ messages }),
     });
   },
 };
@@ -345,10 +373,15 @@ export const searchAPI = {
   },
 };
 
+export const indexAPI = {
+
+}
+
 // Default export with all APIs
 export default {
   prompts: promptsAPI,
   templates: templatesAPI,
   chats: chatsAPI,
   search: searchAPI,
+  index: indexAPI,
 };

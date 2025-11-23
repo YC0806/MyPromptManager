@@ -53,7 +53,6 @@ export default function PromptsList() {
     try {
       setLoading(true)
       const response = await promptsAPI.list({
-        type: 'prompt', // Only fetch prompts
         labels: filters.label || undefined,
         author: filters.author || undefined,
       })

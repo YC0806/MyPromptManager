@@ -15,6 +15,7 @@ from backend.apps.core.exceptions import ResourceNotFoundError, ValidationError
 from backend.apps.core.utils.id_generator import generate_ulid
 from backend.apps.core.domain.itemmetadata import ItemMetadata, VersionSummary
 from backend.apps.core.domain.version import VersionData, TemplateVersionData, TemplateVariable
+from backend.apps.core.domain.chatmetadata import ChatMetadata
 
 
 class FileStorageService:
@@ -377,8 +378,7 @@ class FileStorageService:
         chat_data['id'] = chat_id
 
         # Determine filename
-        title_slug = chat_data.get('title', chat_id).lower().replace(' ', '-')[:50]
-        filename = f"chat_{title_slug}-{chat_id}.json"
+        filename = f"chat-{chat_id}.json"
 
         chat_path = self.storage_root / 'chats' / filename
         chat_path.parent.mkdir(parents=True, exist_ok=True)
@@ -399,11 +399,13 @@ class FileStorageService:
         Returns:
             Chat data
         """
-        chats_dir = self.storage_root / 'chats'
+        filename = f"chat-{chat_id}.json"
+
+        chat_path = self.storage_root / 'chats' / filename
 
         # Find chat file
-        for chat_file in chats_dir.glob(f"chat_*-{chat_id}.json"):
-            with open(chat_file, 'r', encoding='utf-8') as f:
+        if chat_path.exists():
+            with open(chat_path, 'r', encoding='utf-8') as f:
                 return json.load(f)
 
         raise ResourceNotFoundError(f"Chat {chat_id} not found")
@@ -419,7 +421,7 @@ class FileStorageService:
         chats_dir = self.storage_root / 'chats'
 
         # Find and update chat file
-        for chat_file in chats_dir.glob(f"chat_*-{chat_id}.json"):
+        for chat_file in chats_dir.glob(f"chat-{chat_id}.json"):
             chat_data['updated_at'] = datetime.datetime.now(datetime.timezone.utc).isoformat()
             with open(chat_file, 'w', encoding='utf-8') as f:
                 json.dump(chat_data, f, indent=2, ensure_ascii=False)
@@ -434,13 +436,14 @@ class FileStorageService:
         Args:
             chat_id: Chat ID
         """
-        chats_dir = self.storage_root / 'chats'
+        filename = f"chat-{chat_id}.json"
 
-        for chat_file in chats_dir.glob(f"chat_*-{chat_id}.json"):
-            chat_file.unlink()
-            return
+        chat_path = self.storage_root / 'chats' / filename
 
-        raise ResourceNotFoundError(f"Chat {chat_id} not found")
+        if not chat_path.exists():
+            raise ResourceNotFoundError(f"Chat {chat_id} not found")
+
+        chat_path.unlink()
 
     def list_all_items(self, item_type: str) -> List[ItemMetadata]:
         """
@@ -464,12 +467,12 @@ class FileStorageService:
 
         return items
 
-    def list_all_chats(self) -> List[Dict]:
+    def list_all_chats(self) -> List[ChatMetadata]:
         """
         List all chats.
 
         Returns:
-            List of chat data
+            List of ChatMetadata objects
         """
         chats_dir = self.storage_root / 'chats'
         chats = []
@@ -477,13 +480,53 @@ class FileStorageService:
         if not chats_dir.exists():
             return chats
 
-        for chat_file in chats_dir.glob("chat_*.json"):
+        for chat_file in chats_dir.glob("chat-*.json"):
             with open(chat_file, 'r', encoding='utf-8') as f:
-                chats.append(json.load(f))
+                data = json.load(f)
+                chats.append(ChatMetadata.from_dict(data))
 
         return chats
 
-    def find_chat_by_conversation(self, provider: str, conversation_id: str) -> Optional[Dict]:
+    def load_chat(self, chat_id: str) -> ChatMetadata:
+        """
+        Load chat metadata.
+
+        Args:
+            chat_id: Chat ID
+
+        Returns:
+            ChatMetadata object
+        """
+        filename = f"chat-{chat_id}.json"
+        chat_path = self.storage_root / 'chats' / filename
+
+        if not chat_path.exists():
+            raise ResourceNotFoundError(f"Chat {chat_id} not found")
+
+        with open(chat_path, 'r', encoding='utf-8') as f:
+            data = json.load(f)
+            return ChatMetadata.from_dict(data)
+
+    def save_chat(self, chat: ChatMetadata) -> str:
+        """
+        Save chat metadata to JSON file.
+
+        Args:
+            chat: ChatMetadata object
+
+        Returns:
+            chat_id
+        """
+        filename = f"chat-{chat.id}.json"
+        chat_path = self.storage_root / 'chats' / filename
+        chat_path.parent.mkdir(parents=True, exist_ok=True)
+
+        with open(chat_path, 'w', encoding='utf-8') as f:
+            json.dump(chat.__dict__(), f, indent=2, ensure_ascii=False)
+
+        return chat.id
+
+    def find_chat_by_conversation(self, provider: str, conversation_id: str) -> Optional[ChatMetadata]:
         """
         Find a chat by provider and conversation_id.
 
@@ -492,13 +535,13 @@ class FileStorageService:
             conversation_id: Conversation ID from the provider
 
         Returns:
-            Chat data if found, None otherwise
+            ChatMetadata if found, None otherwise
         """
         chats = self.list_all_chats()
 
         for chat in chats:
-            if (chat.get('provider', '').lower() == provider.lower() and
-                chat.get('conversation_id') == conversation_id):
+            if (chat.provider and chat.provider.lower() == provider.lower() and
+                chat.conversation_id == conversation_id):
                 return chat
 
         return None
