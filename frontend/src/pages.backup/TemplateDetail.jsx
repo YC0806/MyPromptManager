@@ -187,7 +187,7 @@ export default function TemplateDetail() {
     try {
       setSaving(true)
       setShowVersionDialog(false)
-      await templatesAPI.createVersions(id, newVersionNumber, content, variables)
+      await templatesAPI.createVersion(id, newVersionNumber, content, variables)
       // Reload data
       await loadTemplate()
       await loadVersions()

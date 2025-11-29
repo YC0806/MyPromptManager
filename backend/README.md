@@ -49,3 +49,10 @@ python manage.py runserver 0.0.0.0:8000
 ## 自检与辅助脚本
 - 若需对接或回归测试，可启用服务器后运行 `python tests/api/run_api_tests.py --base-url http://localhost:8000/v1`；请先根据真实接口调整 `tests/api/api_test_cases.json`，其中默认包含部分尚未实现的端点。 
 - 也可使用 Postman/curl 直接根据 API 参考手动验证。
+
+
+
+# TODO
+- 前端内容提交失败后会丢失，而非暂时保留
+- 搜索栏输入内容后，当焦点不在搜索框和搜索结果框后，收起搜索结果框
+- Metadata和Content加载顺序是否会对内容显示有影响？

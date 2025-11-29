@@ -352,7 +352,7 @@ export const chatsAPI = {
 export const searchAPI = {
   /**
    * Search across all items
-   * @param {Object} params - Search parameters (type, labels, author, limit, cursor)
+   * @param {Object} params - Search parameters (type, labels, author, slug, q, limit, cursor)
    * @returns {Promise<Array>} Currently returns empty array (implementation incomplete on backend)
    */
   search: async (params = {}) => {
@@ -366,6 +366,8 @@ export const searchAPI = {
       }
     }
     if (params.author) query.append('author', params.author);
+    if (params.slug) query.append('slug', params.slug);
+    if (params.q) query.append('q', params.q);
     if (params.limit) query.append('limit', params.limit);
     if (params.cursor) query.append('cursor', params.cursor);
 

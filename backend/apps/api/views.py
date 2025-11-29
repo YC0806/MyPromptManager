@@ -8,8 +8,8 @@ from rest_framework import status
 import datetime
 
 from backend.apps.core.services.file_storage_service import FileStorageService
-from backend.apps.core.services.index_service import IndexService
-from backend.apps.core.exceptions import ValidationError, BadRequestError, IndexLockError
+from backend.apps.core.services.db_index_service import DBIndexService
+from backend.apps.core.exceptions import ValidationError, BadRequestError
 from backend.apps.core.domain.itemmetadata import ItemMetadata
 from backend.apps.core.domain.version import TemplateVariable
 from backend.apps.core.domain.chatmetadata import ChatMetadata
@@ -558,10 +558,12 @@ class SearchView(APIView):
         labels = request.query_params.getlist('labels')
         author = request.query_params.get('author')
         slug = request.query_params.get('slug')
+        query = request.query_params.get('q')
+        provider = request.query_params.get('provider')
         limit = int(request.query_params.get('limit', 50))
         cursor = request.query_params.get('cursor')
 
-        index_service = IndexService()
+        index_service = DBIndexService()
 
         try:
             results = index_service.search(
@@ -569,12 +571,12 @@ class SearchView(APIView):
                 labels=labels,
                 slug=slug,
                 author=author,
+                provider=provider,
+                query=query,
                 limit=limit,
                 cursor=cursor,
             )
             return Response(results)
-        except IndexLockError as e:
-            return Response({'detail': str(e)}, status=status.HTTP_423_LOCKED)
         except Exception as e:
             return Response({'detail': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
@@ -589,7 +591,7 @@ class IndexStatusView(APIView):
     """
 
     def get(self, request):
-        service = IndexService()
+        service = DBIndexService()
         try:
             status_data = service.get_status()
             status_data['entries_count'] = (
@@ -600,8 +602,6 @@ class IndexStatusView(APIView):
             status_data.setdefault('last_error', None)
             status_data['lock_status'] = 'unlocked'
             return Response(status_data)
-        except IndexLockError as e:
-            return Response({'detail': str(e)}, status=status.HTTP_423_LOCKED)
         except Exception as e:
             return Response({'detail': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
@@ -613,13 +613,11 @@ class IndexRebuildView(APIView):
 
     def post(self, request):
         storage = FileStorageService()
-        service = IndexService()
+        service = DBIndexService()
 
         try:
             stats = service.rebuild(storage)
             return Response({'success': True, 'stats': stats})
-        except IndexLockError as e:
-            return Response({'detail': str(e)}, status=status.HTTP_423_LOCKED)
         except Exception as e:
             return Response({'detail': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 

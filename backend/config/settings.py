@@ -120,9 +120,9 @@ REST_FRAMEWORK = {
 # Note: GIT_REPO_ROOT renamed from legacy, now serves as file storage root
 GIT_REPO_ROOT = os.environ.get('STORAGE_ROOT', os.environ.get('GIT_REPO_ROOT', BASE_DIR / 'repo_root'))
 
-# Index settings
-INDEX_PATH = Path(GIT_REPO_ROOT) / '.promptmeta' / 'index.json'
-INDEX_LOCK_PATH = Path(GIT_REPO_ROOT) / '.promptmeta' / 'index.lock'
+# Index settings (DEPRECATED - now using database-backed index)
+# INDEX_PATH = Path(GIT_REPO_ROOT) / '.promptmeta' / 'index.json'
+# INDEX_LOCK_PATH = Path(GIT_REPO_ROOT) / '.promptmeta' / 'index.lock'
 SCHEMA_DIR = BASE_DIR / 'schemas'
 
 # CORS settings for local development

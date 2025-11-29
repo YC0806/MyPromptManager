@@ -16,20 +16,31 @@ from backend.apps.core.utils.id_generator import generate_ulid
 from backend.apps.core.domain.itemmetadata import ItemMetadata, VersionSummary
 from backend.apps.core.domain.version import VersionData, TemplateVersionData, TemplateVariable
 from backend.apps.core.domain.chatmetadata import ChatMetadata
+from backend.apps.core.domain.base_meta import PromptMeta, TemplateMeta, ChatMeta
 
 
 class FileStorageService:
     """Service for file-based storage with versioning."""
 
-    def __init__(self, storage_root: Optional[str] = None):
+    def __init__(self, storage_root: Optional[str] = None, index_service=None):
         """
         Initialize file storage service.
 
         Args:
             storage_root: Root directory for storage. Defaults to settings.GIT_REPO_ROOT
+            index_service: Optional index service for syncing. If None, will be lazy-loaded.
         """
         self.storage_root = Path(storage_root or settings.GIT_REPO_ROOT)
+        self._index_service = index_service
         self._ensure_directory_structure()
+
+    @property
+    def index_service(self):
+        """Lazy-load index service to avoid circular imports."""
+        if self._index_service is None:
+            from backend.apps.core.services.db_index_service import DBIndexService
+            self._index_service = DBIndexService()
+        return self._index_service
 
     def _ensure_directory_structure(self):
         """Ensure basic directory structure exists."""
@@ -92,6 +103,25 @@ class FileStorageService:
         head_file = item_dir / "HEAD"
         head_file.parent.mkdir(parents=True, exist_ok=True)
         head_file.write_text(f"versions/{version_filename}")
+
+    def _sync_to_index(self, item_type: str, metadata: ItemMetadata):
+        """
+        Sync item metadata to database index.
+
+        Args:
+            item_type: 'prompt' or 'template'
+            metadata: ItemMetadata object
+        """
+        # Convert ItemMetadata to appropriate Meta type and then to IndexRecord
+        if item_type == 'prompt':
+            meta = PromptMeta.from_file_dict(metadata.__dict__())
+        elif item_type == 'template':
+            meta = TemplateMeta.from_file_dict(metadata.__dict__())
+        else:
+            return  # Chats are handled separately
+
+        record = meta.to_index_record()
+        self.index_service.add_or_update(record)
 
     def load_metadata(self, item_type: str, item_id: str) -> ItemMetadata:
         """
@@ -184,6 +214,9 @@ class FileStorageService:
         # Update HEAD
         self._set_head_target(item_type, item_id, version_filename)
 
+        # Sync with index
+        self._sync_to_index(item_type, metadata)
+
         return version_id
     
 
@@ -244,6 +277,9 @@ class FileStorageService:
         # Write full metadata to YAML
         yaml_path = item_dir / f"{item_type}.yaml"
         self._write_yaml(yaml_path, metadata.__dict__())
+
+        # Sync with index
+        self._sync_to_index(item_type, metadata)
 
         return True
 
@@ -318,6 +354,9 @@ class FileStorageService:
         if item_dir.exists():
             shutil.rmtree(item_dir)
 
+        # Remove from index
+        self.index_service.remove(item_id)
+
     def delete_version(self, item_type: str, item_id: str, version_id: str) :
         """
         Delete a specific version of an item.
@@ -387,6 +426,11 @@ class FileStorageService:
         with open(chat_path, 'w', encoding='utf-8') as f:
             json.dump(chat_data, f, indent=2, ensure_ascii=False)
 
+        # Sync with index
+        chat_meta = ChatMeta.from_file_dict(chat_data)
+        record = chat_meta.to_index_record()
+        self.index_service.add_or_update(record)
+
         return chat_id
 
     def read_chat(self, chat_id: str) -> Dict:
@@ -425,6 +469,12 @@ class FileStorageService:
             chat_data['updated_at'] = datetime.datetime.now(datetime.timezone.utc).isoformat()
             with open(chat_file, 'w', encoding='utf-8') as f:
                 json.dump(chat_data, f, indent=2, ensure_ascii=False)
+
+            # Sync with index
+            chat_meta = ChatMeta.from_file_dict(chat_data)
+            record = chat_meta.to_index_record()
+            self.index_service.add_or_update(record)
+
             return
 
         raise ResourceNotFoundError(f"Chat {chat_id} not found")
@@ -444,6 +494,9 @@ class FileStorageService:
             raise ResourceNotFoundError(f"Chat {chat_id} not found")
 
         chat_path.unlink()
+
+        # Remove from index
+        self.index_service.remove(chat_id)
 
     def list_all_items(self, item_type: str) -> List[ItemMetadata]:
         """
@@ -523,6 +576,11 @@ class FileStorageService:
 
         with open(chat_path, 'w', encoding='utf-8') as f:
             json.dump(chat.__dict__(), f, indent=2, ensure_ascii=False)
+
+        # Sync with index
+        chat_meta = ChatMeta.from_file_dict(chat.__dict__())
+        record = chat_meta.to_index_record()
+        self.index_service.add_or_update(record)
 
         return chat.id
 

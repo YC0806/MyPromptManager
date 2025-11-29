@@ -61,6 +61,7 @@ class IndexService:
                labels: Optional[List[str]] = None,
                slug: Optional[str] = None,
                author: Optional[str] = None,
+               query: Optional[str] = None,
                limit: int = 50,
                cursor: Optional[str] = None) -> Dict:
         """
@@ -71,6 +72,7 @@ class IndexService:
             labels: Filter by labels (AND logic)
             slug: Filter by slug
             author: Filter by author
+            query: Text query against title/description/slug (case-insensitive contains)
             limit: Max results
             cursor: Pagination cursor (last item id)
 
@@ -78,6 +80,7 @@ class IndexService:
             Dict with results and next cursor
         """
         lock = FileLock(str(self.lock_path), timeout=self.lock_timeout)
+        query_lower = query.lower() if query else None
 
         try:
             with lock:
@@ -119,6 +122,15 @@ class IndexService:
                     if labels:
                         item_labels = item.get('labels', [])
                         if not all(label in item_labels for label in labels):
+                            continue
+                    # Text query filter
+                    if query_lower:
+                        text = " ".join([
+                            item.get('title', ''),
+                            item.get('description', ''),
+                            item.get('slug', ''),
+                        ]).lower()
+                        if query_lower not in text:
                             continue
 
                     results.append(item)
@@ -263,7 +275,7 @@ class IndexService:
         Returns:
             Dict with rebuild statistics
         """
-                lock = FileLock(str(self.lock_path), timeout=self.lock_timeout)
+        lock = FileLock(str(self.lock_path), timeout=self.lock_timeout)
 
         try:
             with lock:

@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react'
-import { Search, Bell, HelpCircle, Menu, Settings, Sun, Moon } from 'lucide-react'
+import { useNavigate } from 'react-router-dom'
+import { Search, Bell, HelpCircle, Menu, Settings, Sun, Moon, Loader2 } from 'lucide-react'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -12,6 +13,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import useStore from '@/store/useStore'
+import api from '@/lib/api'
 
 export default function Topbar() {
   const {
@@ -22,8 +24,11 @@ export default function Topbar() {
     theme,
     toggleTheme,
   } = useStore()
+  const navigate = useNavigate()
 
   const [searchQuery, setSearchQuery] = useState('')
+  const [searchResults, setSearchResults] = useState([])
+  const [searching, setSearching] = useState(false)
 
   // Apply theme to document
   useEffect(() => {
@@ -33,6 +38,89 @@ export default function Topbar() {
       document.documentElement.classList.remove('dark')
     }
   }, [theme])
+
+  // Debounced search against backend index
+  useEffect(() => {
+    if (!searchQuery || searchQuery.trim().length < 2) {
+      setSearchResults([])
+      return
+    }
+
+    const handler = setTimeout(() => {
+      runSearch(searchQuery.trim())
+    }, 300)
+
+    return () => clearTimeout(handler)
+  }, [searchQuery])
+
+  const parseQuery = (query) => {
+    const tokens = query.split(/\s+/)
+    const labels = []
+    let type
+    let author
+    const textParts = []
+
+    tokens.forEach((token) => {
+      if (token.startsWith('type:')) {
+        type = token.replace('type:', '').toLowerCase()
+      } else if (token.startsWith('label:')) {
+        labels.push(token.replace('label:', ''))
+      } else if (token.startsWith('author:')) {
+        author = token.replace('author:', '')
+      } else {
+        textParts.push(token)
+      }
+    })
+
+    return {
+      type,
+      labels,
+      author,
+      q: textParts.join(' ').trim(),
+    }
+  }
+
+  const runSearch = async (query) => {
+    try {
+      setSearching(true)
+      const params = parseQuery(query)
+      const response = await api.search.search({
+        ...params,
+        q: params.q || undefined,
+        labels: params.labels?.length ? params.labels : undefined,
+        limit: 6,
+      })
+      setSearchResults(response.items || [])
+    } catch (error) {
+      console.error('Search failed:', error)
+      setSearchResults([])
+    } finally {
+      setSearching(false)
+    }
+  }
+
+  const getRoute = (type, id) => {
+    switch (type) {
+      case 'template':
+        return `/templates/${id}`
+      case 'chat':
+        return `/chats/${id}`
+      default:
+        return `/prompts/${id}`
+    }
+  }
+
+  const handleNavigate = (item) => {
+    navigate(getRoute(item.type, item.id))
+    setSearchQuery('')
+    setSearchResults([])
+  }
+
+  const onSearchKeyDown = (e) => {
+    if (e.key === 'Enter' && searchResults.length > 0) {
+      handleNavigate(searchResults[0])
+    }
+  }
 
   return (
     <header className={cn(
@@ -62,11 +150,44 @@ export default function Topbar() {
               placeholder="Search by type, label, author..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
+              onKeyDown={onSearchKeyDown}
               className="pl-10 pr-16 rounded-lg shadow-sm dark:bg-zinc-800 dark:border-zinc-700 dark:text-zinc-100"
             />
             <kbd className="absolute right-3 top-1/2 transform -translate-y-1/2 px-2 py-1 text-xs bg-zinc-100 dark:bg-zinc-700 rounded border border-zinc-200 dark:border-zinc-600 text-zinc-600 dark:text-zinc-300">
               ⌘K
             </kbd>
+            {searchQuery.trim().length >= 2 && (
+              <div className="absolute left-0 right-0 mt-2 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-lg shadow-lg overflow-hidden">
+                {searching ? (
+                  <div className="flex items-center gap-2 px-4 py-3 text-sm text-muted-foreground">
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    Searching...
+                  </div>
+                ) : searchResults.length === 0 ? (
+                  <div className="px-4 py-3 text-sm text-muted-foreground">
+                    No results
+                  </div>
+                ) : (
+                  <div className="max-h-80 overflow-y-auto">
+                    {searchResults.map((item) => (
+                      <button
+                        key={item.id}
+                        className="w-full text-left px-4 py-3 hover:bg-zinc-50 dark:hover:bg-zinc-800 transition-colors flex items-center justify-between"
+                        onClick={() => handleNavigate(item)}
+                      >
+                        <div>
+                          <p className="font-medium text-foreground">{item.title}</p>
+                          <p className="text-xs text-muted-foreground">
+                            {item.type} • {item.labels?.join(', ') || 'no labels'}
+                          </p>
+                        </div>
+                        <Badge variant="outline" className="capitalize">{item.type}</Badge>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         </div>
 

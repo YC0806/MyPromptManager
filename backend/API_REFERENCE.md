@@ -297,7 +297,7 @@
 ## Search
 
 ### GET /search
-- 查询参数：`type`（prompt/template/chat）、`labels`（可重复，AND 过滤）、`author`、`slug`、`limit`（默认 50）、`cursor`（上一页最后一条的 `id`）。
+- 查询参数：`type`（prompt/template/chat）、`labels`（可重复，AND 过滤）、`author`、`slug`、`q`（标题/描述/slug 包含，大小写不敏感）、`limit`（默认 50）、`cursor`（上一页最后一条的 `id`）。
 - 响应：来自 `index.json` 的倒序结果（按 `updated_at`），并提供游标分页：
   ```json
   {

@@ -124,7 +124,7 @@ export default function PromptDetail() {
     try {
       setSaving(true)
       setShowVersionDialog(false)
-      await promptsAPI.createVersions(id, newVersionNumber, content)
+      await promptsAPI.createVersion(id, newVersionNumber, content)
       // Reload data
       await loadPrompt()
       await loadVersions()
