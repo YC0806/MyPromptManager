@@ -65,24 +65,24 @@ export default function Dashboard() {
       <div className="max-w-7xl mx-auto px-8 py-12">
         {/* Header */}
         <div className="mb-8">
-          <h1 className="text-4xl font-bold text-foreground mb-2">Dashboard</h1>
-          <p className="text-muted-foreground">Welcome back! Here's what's happening with your prompts.</p>
+          <h1 className="text-4xl font-bold text-zinc-900 dark:text-zinc-100 mb-2">Dashboard</h1>
+          <p className="text-zinc-600 dark:text-zinc-300">Welcome back! Here's what's happening with your prompts.</p>
         </div>
 
         {/* Stats Grid */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
           <Card className="hover:shadow-md transition-shadow duration-200 cursor-pointer dark:bg-zinc-900 dark:border-zinc-800" onClick={() => navigate('/prompts')}>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground">
+              <CardTitle className="text-sm font-medium text-zinc-600 dark:text-zinc-300">
                 Total Prompts
               </CardTitle>
               <FileText className="h-5 w-5 text-teal-500" />
             </CardHeader>
             <CardContent>
-              <div className="text-3xl font-bold text-foreground">
+              <div className="text-3xl font-bold text-zinc-900 dark:text-zinc-100">
                 {loading ? '...' : stats.totalPrompts}
               </div>
-              <p className="text-xs text-muted-foreground mt-1">
+              <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-1">
                 Click to view all prompts
               </p>
             </CardContent>
@@ -90,16 +90,16 @@ export default function Dashboard() {
 
           <Card className="hover:shadow-md transition-shadow duration-200 cursor-pointer dark:bg-zinc-900 dark:border-zinc-800" onClick={() => navigate('/templates')}>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground">
+              <CardTitle className="text-sm font-medium text-zinc-600 dark:text-zinc-300">
                 Total Templates
               </CardTitle>
               <Package className="h-5 w-5 text-teal-500" />
             </CardHeader>
             <CardContent>
-              <div className="text-3xl font-bold text-foreground">
+              <div className="text-3xl font-bold text-zinc-900 dark:text-zinc-100">
                 {loading ? '...' : stats.totalTemplates}
               </div>
-              <p className="text-xs text-muted-foreground mt-1">
+              <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-1">
                 Click to view all templates
               </p>
             </CardContent>
@@ -107,16 +107,16 @@ export default function Dashboard() {
 
           <Card className="hover:shadow-md transition-shadow duration-200 cursor-pointer dark:bg-zinc-900 dark:border-zinc-800" onClick={() => navigate('/chats')}>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground">
+              <CardTitle className="text-sm font-medium text-zinc-600 dark:text-zinc-300">
                 Total Chats
               </CardTitle>
               <MessageSquare className="h-5 w-5 text-teal-500" />
             </CardHeader>
             <CardContent>
-              <div className="text-3xl font-bold text-foreground">
+              <div className="text-3xl font-bold text-zinc-900 dark:text-zinc-100">
                 {loading ? '...' : stats.totalChats}
               </div>
-              <p className="text-xs text-muted-foreground mt-1">
+              <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-1">
                 Click to view all chats
               </p>
             </CardContent>
@@ -135,9 +135,9 @@ export default function Dashboard() {
           </CardHeader>
           <CardContent>
             {loading ? (
-              <div className="text-center py-8 text-muted-foreground">Loading...</div>
+              <div className="text-center py-8 text-zinc-500 dark:text-zinc-400">Loading...</div>
             ) : stats.recentActivity.length === 0 ? (
-              <div className="text-center py-8 text-muted-foreground">
+              <div className="text-center py-8 text-zinc-500 dark:text-zinc-400">
                 <p>No recent activity yet.</p>
                 <p className="text-sm mt-2">Create your first prompt or template to get started!</p>
               </div>
@@ -179,8 +179,8 @@ export default function Dashboard() {
                           {getIcon(activity.type)}
                         </div>
                         <div>
-                          <p className="font-semibold text-foreground">{activity.title}</p>
-                          <p className="text-sm text-muted-foreground">
+                          <p className="font-semibold text-zinc-900 dark:text-zinc-100">{activity.title}</p>
+                          <p className="text-sm text-zinc-500 dark:text-zinc-400">
                             Updated {formatDate(activity.time)}
                           </p>
                         </div>

@@ -63,9 +63,9 @@ export default function TemplatesList() {
           <div>
             <div className="flex items-center gap-3">
               <FileCode className="w-8 h-8 text-purple-500" />
-              <h1 className="text-3xl font-bold text-foreground">Templates</h1>
+              <h1 className="text-3xl font-bold text-zinc-900">Templates</h1>
             </div>
-            <p className="text-muted-foreground mt-1">Manage your reusable template files with variables</p>
+            <p className="text-zinc-600 mt-1">Manage your reusable template files with variables</p>
           </div>
           <Button
             className="bg-purple-500 hover:bg-purple-600"
@@ -77,7 +77,7 @@ export default function TemplatesList() {
         </div>
 
         {/* Toolbar */}
-        <div className="bg-card rounded-lg shadow-sm p-4 mb-6 border border-border">
+        <div className="bg-white dark:bg-zinc-900 rounded-lg shadow-sm p-4 mb-6 border dark:border-zinc-800">
           <div className="flex items-center justify-between gap-4">
             {/* View Toggle */}
             <div className="flex items-center gap-2">
@@ -102,7 +102,7 @@ export default function TemplatesList() {
         {/* Content */}
         {loading ? (
           <div className="flex items-center justify-center h-64">
-            <p className="text-muted-foreground">Loading templates...</p>
+            <p className="text-zinc-500">Loading templates...</p>
           </div>
         ) : viewMode === 'table' ? (
           <TableView
@@ -177,12 +177,12 @@ function TableView({ templates, onSelect, currentPage, setCurrentPage, itemsPerP
   const paginatedTemplates = sortedTemplates.slice(startIndex, startIndex + itemsPerPage)
 
   return (
-    <div className="bg-card rounded-lg shadow-sm overflow-hidden border border-border">
+    <div className="bg-white dark:bg-zinc-900 rounded-lg shadow-sm overflow-hidden border dark:border-zinc-800">
       <table className="w-full">
-        <thead className="bg-muted border-b border-border">
+        <thead className="bg-zinc-50 dark:bg-zinc-800 border-b dark:border-zinc-700">
           <tr>
             <th
-              className="text-left px-6 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wide cursor-pointer hover:bg-muted/80 transition-colors"
+              className="text-left px-6 py-3 text-xs font-semibold text-zinc-600 dark:text-zinc-300 uppercase tracking-wide cursor-pointer hover:bg-zinc-100 dark:hover:bg-zinc-700 transition-colors"
               onClick={() => handleSort('title')}
             >
               <div className="flex items-center">
@@ -191,7 +191,7 @@ function TableView({ templates, onSelect, currentPage, setCurrentPage, itemsPerP
               </div>
             </th>
             <th
-              className="text-left px-6 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wide cursor-pointer hover:bg-muted/80 transition-colors"
+              className="text-left px-6 py-3 text-xs font-semibold text-zinc-600 dark:text-zinc-300 uppercase tracking-wide cursor-pointer hover:bg-zinc-100 dark:hover:bg-zinc-700 transition-colors"
               onClick={() => handleSort('labels')}
             >
               <div className="flex items-center">
@@ -200,7 +200,7 @@ function TableView({ templates, onSelect, currentPage, setCurrentPage, itemsPerP
               </div>
             </th>
             <th
-              className="text-left px-6 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wide cursor-pointer hover:bg-muted/80 transition-colors"
+              className="text-left px-6 py-3 text-xs font-semibold text-zinc-600 dark:text-zinc-300 uppercase tracking-wide cursor-pointer hover:bg-zinc-100 dark:hover:bg-zinc-700 transition-colors"
               onClick={() => handleSort('updated_at')}
             >
               <div className="flex items-center">
@@ -209,7 +209,7 @@ function TableView({ templates, onSelect, currentPage, setCurrentPage, itemsPerP
               </div>
             </th>
             <th
-              className="text-left px-6 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wide cursor-pointer hover:bg-muted/80 transition-colors"
+              className="text-left px-6 py-3 text-xs font-semibold text-zinc-600 dark:text-zinc-300 uppercase tracking-wide cursor-pointer hover:bg-zinc-100 dark:hover:bg-zinc-700 transition-colors"
               onClick={() => handleSort('author')}
             >
               <div className="flex items-center">
@@ -217,24 +217,24 @@ function TableView({ templates, onSelect, currentPage, setCurrentPage, itemsPerP
                 {getSortIcon('author')}
               </div>
             </th>
-            <th className="text-right px-6 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+            <th className="text-right px-6 py-3 text-xs font-semibold text-zinc-600 uppercase tracking-wide">
               Actions
             </th>
           </tr>
         </thead>
-        <tbody className="divide-y divide-border">
+        <tbody className="divide-y dark:divide-zinc-800">
           {paginatedTemplates.map((template) => (
             <tr
               key={template.id}
-              className="hover:bg-muted/60 transition-colors duration-200 cursor-pointer"
+              className="hover:bg-zinc-50 dark:hover:bg-zinc-800 transition-colors duration-200 cursor-pointer"
               onClick={() => onSelect(template)}
             >
               <td className="px-6 py-4">
                 <div className="flex items-center gap-3">
                   <FileCode className="w-5 h-5 text-purple-500" />
                   <div>
-                    <p className="font-semibold text-foreground">{template.title}</p>
-                    <p className="text-xs text-muted-foreground">{template.slug}</p>
+                    <p className="font-semibold text-zinc-900 dark:text-zinc-100">{template.title}</p>
+                    <p className="text-xs text-zinc-500 dark:text-zinc-400">{template.slug}</p>
                   </div>
                 </div>
               </td>
@@ -250,10 +250,10 @@ function TableView({ templates, onSelect, currentPage, setCurrentPage, itemsPerP
                   )}
                 </div>
               </td>
-              <td className="px-6 py-4 text-sm text-muted-foreground">
+              <td className="px-6 py-4 text-sm text-zinc-600 dark:text-zinc-300">
                 {formatDate(template.updated_at)}
               </td>
-              <td className="px-6 py-4 text-sm text-muted-foreground">
+              <td className="px-6 py-4 text-sm text-zinc-600 dark:text-zinc-300">
                 @{template.author}
               </td>
               <td className="px-6 py-4 text-right">
@@ -274,13 +274,13 @@ function TableView({ templates, onSelect, currentPage, setCurrentPage, itemsPerP
         </tbody>
       </table>
       {templates.length === 0 && (
-        <div className="text-center py-12 text-muted-foreground">
+        <div className="text-center py-12 text-zinc-500 dark:text-zinc-400">
           No templates found. Create your first template to get started!
         </div>
       )}
       {templates.length > 0 && (
-        <div className="border-t border-border p-4 flex items-center justify-between">
-          <div className="text-sm text-muted-foreground">
+        <div className="border-t dark:border-zinc-800 p-4 flex items-center justify-between">
+          <div className="text-sm text-zinc-600 dark:text-zinc-300">
             Showing {startIndex + 1} to {Math.min(startIndex + itemsPerPage, sortedTemplates.length)} of {sortedTemplates.length} templates
           </div>
           <div className="flex items-center gap-2">
@@ -292,7 +292,7 @@ function TableView({ templates, onSelect, currentPage, setCurrentPage, itemsPerP
             >
               Previous
             </Button>
-            <span className="text-sm text-muted-foreground">
+            <span className="text-sm text-zinc-600 dark:text-zinc-300">
               Page {currentPage} of {totalPages || 1}
             </span>
             <Button
@@ -348,7 +348,7 @@ function CardsView({ templates, onSelect, currentPage, setCurrentPage, itemsPerP
         {paginatedTemplates.map((template) => (
         <Card
           key={template.id}
-          className="hover:shadow-md transition-shadow duration-200 cursor-pointer"
+          className="hover:shadow-md transition-shadow duration-200 cursor-pointer dark:bg-zinc-900 dark:border-zinc-800"
           onClick={() => onSelect(template)}
         >
           <CardHeader>
@@ -380,7 +380,7 @@ function CardsView({ templates, onSelect, currentPage, setCurrentPage, itemsPerP
               {template.description || 'No description'}
             </CardDescription>
           </CardContent>
-          <CardFooter className="text-xs text-muted-foreground">
+          <CardFooter className="text-xs text-zinc-500 dark:text-zinc-400">
             <span>Updated {formatDate(template.updated_at)}</span>
             <span className="mx-2">•</span>
             <span>@{template.author}</span>
@@ -388,14 +388,14 @@ function CardsView({ templates, onSelect, currentPage, setCurrentPage, itemsPerP
         </Card>
         ))}
         {templates.length === 0 && (
-          <div className="col-span-full text-center py-12 text-muted-foreground">
+          <div className="col-span-full text-center py-12 text-zinc-500">
             No templates found. Create your first template to get started!
           </div>
         )}
       </div>
       {templates.length > 0 && (
-        <div className="mt-6 bg-card rounded-lg shadow-sm p-4 flex items-center justify-between border border-border">
-          <div className="text-sm text-muted-foreground">
+        <div className="mt-6 bg-white dark:bg-zinc-900 rounded-lg shadow-sm p-4 flex items-center justify-between border dark:border-zinc-800">
+          <div className="text-sm text-zinc-600 dark:text-zinc-300">
             Showing {startIndex + 1} to {Math.min(startIndex + itemsPerPage, sortedTemplates.length)} of {sortedTemplates.length} templates
           </div>
           <div className="flex items-center gap-2">
@@ -407,7 +407,7 @@ function CardsView({ templates, onSelect, currentPage, setCurrentPage, itemsPerP
             >
               Previous
             </Button>
-            <span className="text-sm text-muted-foreground">
+            <span className="text-sm text-zinc-600 dark:text-zinc-300">
               Page {currentPage} of {totalPages || 1}
             </span>
             <Button

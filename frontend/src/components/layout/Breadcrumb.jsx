@@ -6,26 +6,31 @@ import { cn } from '@/lib/utils'
 
 export default function Breadcrumb({ items = [], status = null }) {
   return (
-    <div className="flex items-center justify-between h-12 px-8 bg-white/50 border-b">
+    <div className={cn(
+      // 布局
+      "flex items-center justify-between h-12 px-8",
+      // 颜色 - 使用语义化类名，自动适配dark模式
+      "bg-card/50 border-b border-border"
+    )}>
       {/* Left - Breadcrumb Trail */}
       <nav className="flex items-center gap-2 text-sm">
         {items.map((item, index) => (
           <React.Fragment key={index}>
             {index > 0 && (
-              <ChevronRight className="w-4 h-4 text-zinc-400" />
+              <ChevronRight className="w-4 h-4 text-muted-foreground" />
             )}
             {item.href ? (
               <Link
                 to={item.href}
-                className="text-zinc-600 hover:text-teal-600 transition-colors duration-200"
+                className="text-muted-foreground hover:text-primary transition-colors duration-200"
               >
                 {item.label}
               </Link>
             ) : (
               <span className={cn(
                 index === items.length - 1
-                  ? 'text-zinc-900 font-medium'
-                  : 'text-zinc-600'
+                  ? 'text-foreground font-medium'
+                  : 'text-muted-foreground'
               )}>
                 {item.label}
               </span>
@@ -39,7 +44,7 @@ export default function Breadcrumb({ items = [], status = null }) {
         <div className="flex items-center gap-4">
           {status.latestRelease && (
             <div className="flex items-center gap-2">
-              <span className="text-xs text-zinc-500">Latest Release:</span>
+              <span className="text-xs text-muted-foreground">Latest Release:</span>
               <Badge variant="success" className="font-mono">
                 {status.latestRelease.version}
               </Badge>
@@ -50,7 +55,7 @@ export default function Breadcrumb({ items = [], status = null }) {
           )}
           {status.draft && (
             <div className="flex items-center gap-2">
-              <span className="text-xs text-zinc-500">Draft Status:</span>
+              <span className="text-xs text-muted-foreground">Draft Status:</span>
               <Badge variant="warning">
                 {status.draft.message}
               </Badge>

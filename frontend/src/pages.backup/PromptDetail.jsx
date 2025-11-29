@@ -148,7 +148,7 @@ export default function PromptDetail() {
       <div className="min-h-screen">
         <Breadcrumb items={breadcrumbItems} />
         <div className="flex items-center justify-center h-64">
-          <p className="text-muted-foreground">Loading prompt...</p>
+          <p className="text-zinc-500">Loading prompt...</p>
         </div>
       </div>
     )
@@ -162,7 +162,7 @@ export default function PromptDetail() {
         {/* Header */}
         <div className="flex items-center justify-between mb-6">
           <div>
-            <h1 className="text-3xl font-bold text-foreground">{metadata.title}</h1>
+            <h1 className="text-3xl font-bold text-zinc-900 dark:text-zinc-100">{metadata.title}</h1>
             <div className="flex gap-2 mt-2">
               {metadata.labels.map((label, idx) => (
                 <Badge key={idx} variant="outline">{label}</Badge>
@@ -208,7 +208,7 @@ export default function PromptDetail() {
                   className="min-h-[600px] font-mono text-sm dark:bg-zinc-800 dark:border-zinc-700 dark:text-zinc-100"
                   placeholder="Enter your prompt content here..."
                 />
-                <div className="flex items-center justify-between mt-4 text-xs text-muted-foreground">
+                <div className="flex items-center justify-between mt-4 text-xs text-zinc-500 dark:text-zinc-400">
                   <span>
                     Words: {content.split(/\s+/).filter(w => w.length > 0).length} |
                     Characters: {content.length}
@@ -310,7 +310,7 @@ export default function PromptDetail() {
               <CardContent>
                 <div className="space-y-2">
                   {versions.length === 0 ? (
-                    <p className="text-sm text-muted-foreground">No versions yet</p>
+                    <p className="text-sm text-zinc-500 dark:text-zinc-400">No versions yet</p>
                   ) : (
                     versions.map((version) => (
                       <div
@@ -324,10 +324,10 @@ export default function PromptDetail() {
                       >
                         <div className="flex items-center justify-between">
                           <div className="flex-1">
-                            <p className="font-mono text-sm font-semibold text-foreground">
+                            <p className="font-mono text-sm font-semibold text-zinc-900 dark:text-zinc-100">
                               {version.version_number.substring(0, 8)}
                             </p>
-                            <p className="text-xs text-muted-foreground mt-1">
+                            <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-1">
                               {version.id.substring(0, 8)} - {formatDate(version.created_at)}
                             </p>
                           </div>
@@ -383,7 +383,7 @@ export default function PromptDetail() {
                   }
                 }}
               />
-              <p className="text-sm text-muted-foreground">
+              <p className="text-sm text-zinc-500 dark:text-zinc-400">
                 Current version: {versionNumber || 'None'}
               </p>
             </div>

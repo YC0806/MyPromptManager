@@ -5,7 +5,9 @@ const Card = React.forwardRef(({ className, ...props }, ref) => (
   <div
     ref={ref}
     className={cn(
-      "rounded-lg border bg-white shadow-sm transition-shadow duration-200",
+      "rounded-lg shadow-sm transition-shadow duration-200",
+      // 使用语义化类名，自动适配dark模式
+      "border border-border bg-card text-card-foreground",
       className
     )}
     {...props}
@@ -26,7 +28,9 @@ const CardTitle = React.forwardRef(({ className, ...props }, ref) => (
   <h3
     ref={ref}
     className={cn(
-      "text-2xl font-semibold leading-none tracking-tight text-zinc-900",
+      "text-2xl font-semibold leading-none tracking-tight",
+      // 使用语义化类名，自动适配dark模式
+      "text-card-foreground",
       className
     )}
     {...props}
@@ -37,7 +41,12 @@ CardTitle.displayName = "CardTitle"
 const CardDescription = React.forwardRef(({ className, ...props }, ref) => (
   <p
     ref={ref}
-    className={cn("text-sm text-zinc-600", className)}
+    className={cn(
+      "text-sm",
+      // 使用语义化类名，自动适配dark模式
+      "text-muted-foreground",
+      className
+    )}
     {...props}
   />
 ))

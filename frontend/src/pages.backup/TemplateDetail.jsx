@@ -1,6 +1,6 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { Save, X, Clock, History } from 'lucide-react'
+import { Save, X, Clock, FileCode, History } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -16,17 +16,19 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import Breadcrumb from '@/components/layout/Breadcrumb'
-import { promptsAPI } from '@/lib/api'
+import {promptsAPI, templatesAPI} from '@/lib/api'
 import { formatDate } from '@/lib/utils'
 
-export default function PromptDetail() {
+export default function TemplateDetail() {
   const { id } = useParams()
   const navigate = useNavigate()
-  const [prompt, setPrompt] = useState(null)
+  const [template, setTemplate] = useState(null)
   const [versions, setVersions] = useState([])
   const [selectedVersion, setSelectedVersion] = useState(null)
   const [versionNumber, setVersionNumber] = useState('')
   const [content, setContent] = useState('')
+  const [variables, setVariables] = useState([])
+  const variableHistoryRef = useRef(new Map())
   const [metadata, setMetadata] = useState({
     title: '',
     description: '',
@@ -39,22 +41,22 @@ export default function PromptDetail() {
   const [newVersionNumber, setNewVersionNumber] = useState('')
 
   useEffect(() => {
-    loadPrompt()
+    loadTemplate()
     loadVersions()
   }, [id])
 
-  const loadPrompt = async () => {
+  const loadTemplate = async () => {
     try {
       setLoading(true)
-      const response = await promptsAPI.get(id)
-      setPrompt(response)
+      const response = await templatesAPI.get(id)
+      setTemplate(response)
       setMetadata({
         title: response.title || '',
         description: response.description || '',
         labels: response.labels || [],
       })
     } catch (error) {
-      console.error('Failed to load prompt:', error)
+      console.error('Failed to load template:', error)
     } finally {
       setLoading(false)
     }
@@ -62,10 +64,10 @@ export default function PromptDetail() {
 
   const loadVersions = async () => {
     try {
-      const response = await promptsAPI.listVersions(id)
+      const response = await templatesAPI.listVersions(id)
       setVersions(response.versions || [])
       if (response.versions && response.versions.length > 0) {
-          await handleVersionSelect(response.versions[0].id)
+        await handleVersionSelect(response.versions[0].id)
       }
     } catch (error) {
       console.error('Failed to load versions:', error)
@@ -75,12 +77,73 @@ export default function PromptDetail() {
   const handleVersionSelect = async (versionId) => {
     try {
       setSelectedVersion(versionId)
-      const versionData = await promptsAPI.getVersion(id, versionId)
+      const versionData = await templatesAPI.getVersion(id, versionId)
+      const versionContent = versionData.content || ''
+      const versionVariables = (versionData.variables || []).map(variable => ({
+        name: variable.name,
+        description: variable.description || '',
+        default: variable.default || '',
+      }))
+      const syncedVariables = syncVariablesWithContent(versionContent, versionVariables)
+      rememberVariables([...versionVariables, ...syncedVariables])
+      setVariables(syncedVariables)
       setVersionNumber(versionData.version_number)
-      setContent(versionData.content || '')
+      setContent(versionContent)
+
     } catch (error) {
       console.error('Failed to load version:', error)
     }
+  }
+ 
+  const rememberVariables = (vars = []) => {
+    const history = variableHistoryRef.current
+    vars.forEach(variable => {
+      if (!variable?.name) return
+      history.set(variable.name, {
+        description: variable.description || '',
+        default: variable.default || '',
+      })
+    })
+  }
+
+  const extractVariables = (text) => {
+    const regex = /\{\{(\w+)\}\}/g
+    const matches = [...text.matchAll(regex)]
+    return [...new Set(matches.map(m => m[1]))]
+  }
+
+  const syncVariablesWithContent = (text, sourceVariables = []) => {
+    const detectedVariables = extractVariables(text)
+    const variableMap = new Map(sourceVariables.map(variable => [variable.name, variable]))
+    return detectedVariables.map(varName => {
+      const existing = variableMap.get(varName) || variableHistoryRef.current.get(varName)
+      return {
+        name: varName,
+        description: existing?.description || '',
+        default: existing?.default || '',
+      }
+    })
+  }
+
+  const updateVariables = (text) => {
+    setVariables(prevVariables => {
+      rememberVariables(prevVariables)
+      const synced = syncVariablesWithContent(text, prevVariables)
+      rememberVariables(synced)
+      return synced
+    })
+  }
+
+  const handleVariableChange = (varName, field, value) => {
+    setVariables(prevVariables => {
+      const updated = prevVariables.map(variable =>
+        variable.name === varName
+          ? { ...variable, [field]: value }
+          : variable
+      )
+      rememberVariables(updated)
+      return updated
+    })
   }
 
   const handleAddLabel = () => {
@@ -98,7 +161,7 @@ export default function PromptDetail() {
   }
 
   const handleSaveMetaData = async () => {
-      await promptsAPI.update(id, metadata.title, metadata.labels, metadata.description)
+      await templatesAPI.update(id, metadata.title, metadata.labels, metadata.description)
   }
 
   const handleOpenVersionDialog = () => {
@@ -124,9 +187,9 @@ export default function PromptDetail() {
     try {
       setSaving(true)
       setShowVersionDialog(false)
-      await promptsAPI.createVersions(id, newVersionNumber, content)
+      await templatesAPI.createVersions(id, newVersionNumber, content, variables)
       // Reload data
-      await loadPrompt()
+      await loadTemplate()
       await loadVersions()
       alert('New version saved successfully!')
     } catch (error) {
@@ -139,7 +202,7 @@ export default function PromptDetail() {
 
   const breadcrumbItems = [
     { label: 'Home', href: '/' },
-    { label: 'Prompts', href: '/prompts' },
+    { label: 'Templates', href: '/templates' },
     { label: metadata.title || 'Loading...' },
   ]
 
@@ -148,7 +211,7 @@ export default function PromptDetail() {
       <div className="min-h-screen">
         <Breadcrumb items={breadcrumbItems} />
         <div className="flex items-center justify-center h-64">
-          <p className="text-muted-foreground">Loading prompt...</p>
+          <p className="text-zinc-500">Loading template...</p>
         </div>
       </div>
     )
@@ -162,20 +225,24 @@ export default function PromptDetail() {
         {/* Header */}
         <div className="flex items-center justify-between mb-6">
           <div>
-            <h1 className="text-3xl font-bold text-foreground">{metadata.title}</h1>
+            <div className="flex items-center gap-3">
+              <FileCode className="w-8 h-8 text-purple-500" />
+              <h1 className="text-3xl font-bold text-zinc-900 dark:text-zinc-100">{metadata.title}</h1>
+            </div>
             <div className="flex gap-2 mt-2">
               {metadata.labels.map((label, idx) => (
                 <Badge key={idx} variant="outline">{label}</Badge>
               ))}
+              <Badge className="bg-purple-100 text-purple-700">Template</Badge>
             </div>
           </div>
           <div className="flex gap-2">
-            <Button variant="outline" onClick={() => navigate('/prompts')}>
+            <Button variant="outline" onClick={() => navigate('/templates')}>
               <X className="w-4 h-4 mr-2" />
               Close
             </Button>
             <Button
-              className="bg-teal-500 hover:bg-teal-600"
+              className="bg-purple-500 hover:bg-purple-600"
               onClick={handleOpenVersionDialog}
               disabled={saving}
             >
@@ -183,7 +250,7 @@ export default function PromptDetail() {
               {saving ? 'Saving...' : 'Save as New Version'}
             </Button>
 
-            <Button variant="outline" onClick={() => navigate(`/prompts/${id}/timeline`)}>
+            <Button variant="outline" onClick={() => navigate(`/templates/${id}/timeline`)}>
               <History className="w-4 h-4 mr-2" />
               Timeline
             </Button>
@@ -196,22 +263,26 @@ export default function PromptDetail() {
           <div className="col-span-8">
             <Card className="dark:bg-zinc-900 dark:border-zinc-800">
               <CardHeader>
-                <CardTitle>Prompt Content - {versionNumber}</CardTitle>
+                <CardTitle>Template Content - {versionNumber}</CardTitle>
                 <CardDescription>
-                  Edit your prompt content in Markdown
+                  Edit template content with {`{{variable}}`} placeholders
                 </CardDescription>
               </CardHeader>
               <CardContent>
                 <Textarea
                   value={content}
-                  onChange={(e) => setContent(e.target.value)}
+                  onChange={(e) => {
+                    const newContent = e.target.value
+                    setContent(newContent)
+                    updateVariables(newContent)
+                  }}
                   className="min-h-[600px] font-mono text-sm dark:bg-zinc-800 dark:border-zinc-700 dark:text-zinc-100"
-                  placeholder="Enter your prompt content here..."
+                  placeholder="Enter your template content with variables..."
                 />
-                <div className="flex items-center justify-between mt-4 text-xs text-muted-foreground">
+                <div className="flex items-center justify-between mt-4 text-xs text-zinc-500 dark:text-zinc-400">
                   <span>
                     Words: {content.split(/\s+/).filter(w => w.length > 0).length} |
-                    Characters: {content.length}
+                    Variables: {variables.length}
                   </span>
                 </div>
               </CardContent>
@@ -224,15 +295,15 @@ export default function PromptDetail() {
             <Card className="dark:bg-zinc-900 dark:border-zinc-800">
               <CardHeader>
                 <CardTitle>Metadata</CardTitle>
-                <CardDescription>Edit prompt properties</CardDescription>
+                <CardDescription>Edit template properties</CardDescription>
                 <Button
-                    className="bg-teal-500 hover:bg-teal-600"
+                    className="bg-purple-500 hover:bg-purple-600"
                     onClick={handleSaveMetaData}
                     disabled={saving}
-                >
-                <Save className="w-4 h-4 mr-2" />
+                  >
+                  <Save className="w-4 h-4 mr-2" />
                     {saving ? 'Saving...' : 'Save MetaData'}
-                </Button>
+                  </Button>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div>
@@ -242,7 +313,6 @@ export default function PromptDetail() {
                     value={metadata.title}
                     onChange={(e) => setMetadata({ ...metadata, title: e.target.value })}
                     placeholder="Enter title..."
-                    className="dark:bg-zinc-800 dark:border-zinc-700 dark:text-zinc-100"
                   />
                 </div>
 
@@ -254,7 +324,6 @@ export default function PromptDetail() {
                     onChange={(e) => setMetadata({ ...metadata, description: e.target.value })}
                     placeholder="Enter description..."
                     rows={3}
-                    className="dark:bg-zinc-800 dark:border-zinc-700 dark:text-zinc-100"
                   />
                 </div>
 
@@ -265,7 +334,6 @@ export default function PromptDetail() {
                       value={newLabel}
                       onChange={(e) => setNewLabel(e.target.value)}
                       placeholder="Add label..."
-                      className="dark:bg-zinc-800 dark:border-zinc-700 dark:text-zinc-100"
                       onKeyPress={(e) => {
                         if (e.key === 'Enter') {
                           e.preventDefault()
@@ -273,11 +341,7 @@ export default function PromptDetail() {
                         }
                       }}
                     />
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={handleAddLabel}
-                    >
+                    <Button variant="outline" size="sm" onClick={handleAddLabel}>
                       Add
                     </Button>
                   </div>
@@ -285,10 +349,7 @@ export default function PromptDetail() {
                     {metadata.labels.map((label, idx) => (
                       <Badge key={idx} variant="secondary" className="cursor-pointer">
                         {label}
-                        <X
-                          className="w-3 h-3 ml-1"
-                          onClick={() => handleRemoveLabel(label)}
-                        />
+                        <X className="w-3 h-3 ml-1" onClick={() => handleRemoveLabel(label)} />
                       </Badge>
                     ))}
                   </div>
@@ -304,32 +365,37 @@ export default function PromptDetail() {
                   Version History
                 </CardTitle>
                 <CardDescription>
-                  Select a version to view (latest at top)
+                  Select a version (latest at top)
                 </CardDescription>
               </CardHeader>
               <CardContent>
                 <div className="space-y-2">
                   {versions.length === 0 ? (
-                    <p className="text-sm text-muted-foreground">No versions yet</p>
+                    <p className="text-sm text-zinc-500">No versions yet</p>
                   ) : (
                     versions.map((version) => (
                       <div
                         key={version.id}
                         className={`p-3 rounded-lg border cursor-pointer transition-colors ${
                           selectedVersion === version.id
-                            ? 'bg-teal-50 dark:bg-teal-900/30 border-teal-300 dark:border-teal-700'
-                            : 'bg-white dark:bg-zinc-800 hover:bg-zinc-50 dark:hover:bg-zinc-700 border-zinc-200 dark:border-zinc-700'
+                            ? 'bg-purple-50 border-purple-300'
+                            : 'bg-white hover:bg-zinc-50'
                         }`}
                         onClick={() => handleVersionSelect(version.id)}
                       >
                         <div className="flex items-center justify-between">
                           <div className="flex-1">
-                            <p className="font-mono text-sm font-semibold text-foreground">
-                              {version.version_number.substring(0, 8)}
+                            <p className="font-mono text-sm font-semibold text-zinc-900">
+                              {version.version_number}
                             </p>
-                            <p className="text-xs text-muted-foreground mt-1">
+                            <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-1">
                               {version.id.substring(0, 8)} - {formatDate(version.created_at)}
                             </p>
+                            {version.variables && version.variables.length > 0 && (
+                              <p className="text-xs text-purple-600 mt-1">
+                                {version.variables.length} variables
+                              </p>
+                            )}
                           </div>
                           {selectedVersion === version.id && (
                             <Badge variant="success" className="ml-2">Current</Badge>
@@ -342,24 +408,45 @@ export default function PromptDetail() {
               </CardContent>
             </Card>
 
-            {/* Info */}
-            <Card className="bg-amber-50 dark:bg-amber-900/20 border-amber-200 dark:border-amber-800">
-              <CardHeader>
-                <CardTitle className="text-amber-900 dark:text-amber-400 text-sm">Note</CardTitle>
-              </CardHeader>
-              <CardContent className="text-sm text-amber-800 dark:text-amber-300 space-y-2">
-                <p>• Each save creates a new version</p>
-                <p>• All versions are preserved</p>
-                <p>• Click on a version to view its content</p>
-              </CardContent>
-            </Card>
+            {/* Variable Descriptions */}
+            {variables.length > 0 && (
+              <Card className="mt-6">
+                <CardHeader>
+                  <CardTitle>Variable Descriptions</CardTitle>
+                  <CardDescription>Define descriptions and defaults for detected variables</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-3">
+                    {variables.map((variable) => (
+                      <div key={variable.name} className="p-4 bg-purple-50 rounded-lg border border-purple-200">
+                        <div className="font-mono text-sm font-semibold text-purple-700 mb-3">
+                          {`{{${variable.name}}}`}
+                        </div>
+                        <div className="space-y-2">
+                          <Input
+                            placeholder="Description..."
+                            value={variable.description || ''}
+                            onChange={(e) => handleVariableChange(variable.name, 'description', e.target.value)}
+                          />
+                          <Input
+                            placeholder="Default value..."
+                            value={variables.find(v => v.name === variable.name)?.default || ''}
+                            onChange={(e) => handleVariableChange(variable.name, 'default', e.target.value)}
+                          />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+            )}
           </div>
         </div>
       </div>
 
       {/* Version Number Dialog */}
       <Dialog open={showVersionDialog} onOpenChange={setShowVersionDialog}>
-        <DialogContent className="dark:bg-zinc-900 dark:border-zinc-800">
+        <DialogContent>
           <DialogHeader>
             <DialogTitle>Save as New Version</DialogTitle>
             <DialogDescription>
@@ -375,7 +462,6 @@ export default function PromptDetail() {
                 onChange={(e) => setNewVersionNumber(e.target.value)}
                 placeholder="e.g., 1.0.0"
                 autoFocus
-                className="dark:bg-zinc-800 dark:border-zinc-700 dark:text-zinc-100"
                 onKeyPress={(e) => {
                   if (e.key === 'Enter') {
                     e.preventDefault()
@@ -383,7 +469,7 @@ export default function PromptDetail() {
                   }
                 }}
               />
-              <p className="text-sm text-muted-foreground">
+              <p className="text-sm text-zinc-500">
                 Current version: {versionNumber || 'None'}
               </p>
             </div>
@@ -396,7 +482,7 @@ export default function PromptDetail() {
               Cancel
             </Button>
             <Button
-              className="bg-teal-500 hover:bg-teal-600"
+              className="bg-purple-500 hover:bg-purple-600"
               onClick={handleSaveNewVersion}
               disabled={saving}
             >

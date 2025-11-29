@@ -102,7 +102,7 @@ export default function ChatDetail() {
         {/* Header Actions */}
         <div className="flex items-center justify-between mb-6">
           <div>
-            <h1 className="text-3xl font-bold text-foreground">{chatData.title}</h1>
+            <h1 className="text-3xl font-bold text-zinc-900 dark:text-zinc-100">{chatData.title}</h1>
             <div className="flex gap-2 mt-2">
               {chatData.labels?.map((label, idx) => (
                 <Badge key={idx} variant="outline">{label}</Badge>
@@ -330,7 +330,7 @@ function MessageBubble({ message }) {
           <p className="text-sm whitespace-pre-wrap">{message.content}</p>
         </div>
         {message.timestamp && (
-          <p className="text-xs text-muted-foreground mt-1 px-1">
+          <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-1 px-1">
             {formatDate(message.timestamp)}
           </p>
         )}

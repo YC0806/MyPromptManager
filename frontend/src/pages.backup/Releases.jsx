@@ -47,20 +47,20 @@ export default function Releases() {
       <div className="max-w-7xl mx-auto px-8 py-12">
         {/* Header */}
         <div className="mb-8">
-          <h1 className="text-4xl font-bold text-foreground mb-2">Releases</h1>
-          <p className="text-muted-foreground">View all published releases</p>
+          <h1 className="text-4xl font-bold text-zinc-900 dark:text-zinc-100 mb-2">Releases</h1>
+          <p className="text-zinc-600 dark:text-zinc-300">View all published releases</p>
         </div>
 
         {/* Swimlane Timeline */}
         {loading ? (
           <div className="flex items-center justify-center h-64">
-            <p className="text-muted-foreground">Loading releases...</p>
+            <p className="text-zinc-500 dark:text-zinc-400">Loading releases...</p>
           </div>
         ) : (
           <div className="space-y-8">
             {/* Production Lane */}
             <div className="space-y-4">
-              <h2 className="text-2xl font-bold text-foreground flex items-center gap-2">
+              <h2 className="text-2xl font-bold text-zinc-900 dark:text-zinc-100 flex items-center gap-2">
                 <GitBranch className="w-5 h-5 text-teal-500" />
                 Production
               </h2>
@@ -82,7 +82,7 @@ export default function Releases() {
 
             {/* Beta Lane */}
             <div className="space-y-4">
-              <h2 className="text-2xl font-bold text-foreground flex items-center gap-2">
+              <h2 className="text-2xl font-bold text-zinc-900 dark:text-zinc-100 flex items-center gap-2">
                 <GitBranch className="w-5 h-5 text-amber-500" />
                 Beta
               </h2>
@@ -121,8 +121,8 @@ function ReleaseCard({ release, channel }) {
         <CardTitle className="text-base">{release.title}</CardTitle>
       </CardHeader>
       <CardContent>
-        <p className="text-xs text-muted-foreground line-clamp-2">{release.notes}</p>
-        <p className="text-xs text-muted-foreground mt-2">
+        <p className="text-xs text-zinc-600 dark:text-zinc-300 line-clamp-2">{release.notes}</p>
+        <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-2">
           {formatDate(release.time)}
         </p>
       </CardContent>

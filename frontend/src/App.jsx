@@ -23,7 +23,7 @@ function App() {
 
   return (
     <Router>
-      <div className="min-h-screen bg-gradient-to-br from-teal-50 via-emerald-50 to-cyan-50">
+      <div className="min-h-screen">
         <Sidebar />
         <div
           className={`transition-all duration-200 ${

@@ -6,7 +6,20 @@ const Input = React.forwardRef(({ className, type, ...props }, ref) => {
     <input
       type={type}
       className={cn(
-        "flex h-10 w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-zinc-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-500 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 transition-colors duration-200",
+        // 布局
+        "flex h-10 w-full rounded-md px-3 py-2 text-sm",
+        // 颜色 - 使用语义化类名，自动适配dark模式
+        "border border-input bg-background text-foreground",
+        "placeholder:text-muted-foreground",
+        // 焦点状态
+        "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
+        "ring-offset-background",
+        // 文件上传样式
+        "file:border-0 file:bg-transparent file:text-sm file:font-medium file:text-foreground",
+        // 禁用状态
+        "disabled:cursor-not-allowed disabled:opacity-50",
+        // 过渡动画
+        "transition-colors duration-200",
         className
       )}
       ref={ref}

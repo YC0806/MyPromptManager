@@ -211,7 +211,7 @@ export default function TemplateDetail() {
       <div className="min-h-screen">
         <Breadcrumb items={breadcrumbItems} />
         <div className="flex items-center justify-center h-64">
-          <p className="text-zinc-500">Loading template...</p>
+          <p className="text-muted-foreground">Loading template...</p>
         </div>
       </div>
     )
@@ -227,7 +227,7 @@ export default function TemplateDetail() {
           <div>
             <div className="flex items-center gap-3">
               <FileCode className="w-8 h-8 text-purple-500" />
-              <h1 className="text-3xl font-bold text-zinc-900">{metadata.title}</h1>
+              <h1 className="text-3xl font-bold text-foreground">{metadata.title}</h1>
             </div>
             <div className="flex gap-2 mt-2">
               {metadata.labels.map((label, idx) => (
@@ -261,7 +261,7 @@ export default function TemplateDetail() {
         <div className="grid grid-cols-12 gap-6">
           {/* Main Content Area - Left (8/12) */}
           <div className="col-span-8">
-            <Card>
+            <Card className="dark:bg-zinc-900 dark:border-zinc-800">
               <CardHeader>
                 <CardTitle>Template Content - {versionNumber}</CardTitle>
                 <CardDescription>
@@ -276,10 +276,10 @@ export default function TemplateDetail() {
                     setContent(newContent)
                     updateVariables(newContent)
                   }}
-                  className="min-h-[600px] font-mono text-sm"
+                  className="min-h-[600px] font-mono text-sm dark:bg-zinc-800 dark:border-zinc-700 dark:text-zinc-100"
                   placeholder="Enter your template content with variables..."
                 />
-                <div className="flex items-center justify-between mt-4 text-xs text-zinc-500">
+                <div className="flex items-center justify-between mt-4 text-xs text-muted-foreground">
                   <span>
                     Words: {content.split(/\s+/).filter(w => w.length > 0).length} |
                     Variables: {variables.length}
@@ -292,7 +292,7 @@ export default function TemplateDetail() {
           {/* Secondary Content Area - Right (4/12) */}
           <div className="col-span-4 space-y-6">
             {/* Metadata */}
-            <Card>
+            <Card className="dark:bg-zinc-900 dark:border-zinc-800">
               <CardHeader>
                 <CardTitle>Metadata</CardTitle>
                 <CardDescription>Edit template properties</CardDescription>
@@ -358,7 +358,7 @@ export default function TemplateDetail() {
             </Card>
 
             {/* Version History */}
-            <Card>
+            <Card className="dark:bg-zinc-900 dark:border-zinc-800">
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <Clock className="w-5 h-5" />
@@ -388,7 +388,7 @@ export default function TemplateDetail() {
                             <p className="font-mono text-sm font-semibold text-zinc-900">
                               {version.version_number}
                             </p>
-                            <p className="text-xs text-zinc-500 mt-1">
+                            <p className="text-xs text-muted-foreground mt-1">
                               {version.id.substring(0, 8)} - {formatDate(version.created_at)}
                             </p>
                             {version.variables && version.variables.length > 0 && (

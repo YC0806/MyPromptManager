@@ -84,7 +84,7 @@ export default function IndexStatus() {
 
         {loading ? (
           <div className="flex items-center justify-center h-64">
-            <p className="text-muted-foreground">Loading index status...</p>
+            <p className="text-zinc-500">Loading index status...</p>
           </div>
         ) : (
           <div className="space-y-6">

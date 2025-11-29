@@ -4,26 +4,74 @@
 
 @layer base {
   :root {
-    --background: 0 0% 100%;
-    --foreground: 240 10% 3.9%;
-    --card: 0 0% 100%;
-    --card-foreground: 240 10% 3.9%;
-    --popover: 0 0% 100%;
-    --popover-foreground: 240 10% 3.9%;
-    --primary: 142.1 76.2% 36.3%;
+    /* === 背景层级 === */
+    --background: 0 0% 100%;              /* 主背景 */
+    --foreground: 240 10% 3.9%;           /* 主文字 */
+
+    /* === 组件背景 === */
+    --card: 0 0% 100%;                    /* 卡片背景 */
+    --card-foreground: 240 10% 3.9%;      /* 卡片文字 */
+
+    --popover: 0 0% 100%;                 /* 弹出层背景 */
+    --popover-foreground: 240 10% 3.9%;   /* 弹出层文字 */
+
+    /* === 语义化颜色 === */
+    --primary: 142.1 76.2% 36.3%;         /* 主色调 (青绿色) */
     --primary-foreground: 355.7 100% 97.3%;
-    --secondary: 240 4.8% 95.9%;
+
+    --secondary: 240 4.8% 95.9%;          /* 次要色 */
     --secondary-foreground: 240 5.9% 10%;
-    --muted: 240 4.8% 95.9%;
-    --muted-foreground: 240 3.8% 46.1%;
-    --accent: 240 4.8% 95.9%;
+
+    --muted: 240 4.8% 95.9%;              /* 柔和色 */
+    --muted-foreground: 240 3.8% 46.1%;   /* 柔和文字 */
+
+    --accent: 240 4.8% 95.9%;             /* 强调色 */
     --accent-foreground: 240 5.9% 10%;
-    --destructive: 0 84.2% 60.2%;
+
+    --destructive: 0 84.2% 60.2%;         /* 危险色 */
     --destructive-foreground: 0 0% 98%;
-    --border: 240 5.9% 90%;
-    --input: 240 5.9% 90%;
-    --ring: 142.1 76.2% 36.3%;
+
+    /* === 边框和输入 === */
+    --border: 240 5.9% 90%;               /* 边框颜色 */
+    --input: 240 5.9% 90%;                /* 输入框边框 */
+    --ring: 142.1 76.2% 36.3%;            /* 焦点环 */
+
+    /* === 圆角 === */
     --radius: 0.5rem;
+  }
+
+  .dark {
+    /* === 背景层级 === */
+    --background: 240 10% 3.9%;           /* 深色主背景 */
+    --foreground: 0 0% 98%;               /* 浅色文字 */
+
+    /* === 组件背景 === */
+    --card: 240 10% 7%;                   /* 稍亮于背景 */
+    --card-foreground: 0 0% 98%;
+
+    --popover: 240 10% 7%;                /* 弹出层 */
+    --popover-foreground: 0 0% 98%;
+
+    /* === 语义化颜色 === */
+    --primary: 142.1 70.6% 45.3%;         /* 亮青绿色 */
+    --primary-foreground: 144.9 80.4% 10%;
+
+    --secondary: 240 3.7% 15.9%;          /* 深灰色 */
+    --secondary-foreground: 0 0% 98%;
+
+    --muted: 240 3.7% 15.9%;              /* 柔和深色 */
+    --muted-foreground: 240 5% 64.9%;     /* 柔和文字 */
+
+    --accent: 240 3.7% 15.9%;             /* 强调深色 */
+    --accent-foreground: 0 0% 98%;
+
+    --destructive: 0 62.8% 30.6%;         /* 深红色 */
+    --destructive-foreground: 0 0% 98%;
+
+    /* === 边框和输入 === */
+    --border: 240 3.7% 15.9%;             /* 深色边框 */
+    --input: 240 3.7% 15.9%;              /* 深色输入框边框 */
+    --ring: 142.4 71.8% 29.2%;            /* 深色焦点环 */
   }
 }
 
@@ -32,6 +80,6 @@
     @apply border-border;
   }
   body {
-    @apply bg-gradient-to-br from-teal-50 via-emerald-50 to-cyan-50 text-foreground;
+    @apply bg-gradient-to-br from-teal-50 via-emerald-50 to-cyan-50 dark:from-zinc-950 dark:via-zinc-900 dark:to-zinc-950 text-foreground;
   }
 }

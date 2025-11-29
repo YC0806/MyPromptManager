@@ -78,8 +78,8 @@ export default function PromptCreate() {
         {/* Header */}
         <div className="flex items-center justify-between mb-6">
           <div>
-            <h1 className="text-3xl font-bold text-foreground">Create New Prompt</h1>
-            <p className="text-muted-foreground mt-1">Write metadata and content for your new prompt</p>
+            <h1 className="text-3xl font-bold text-zinc-900 dark:text-zinc-100">Create New Prompt</h1>
+            <p className="text-zinc-600 dark:text-zinc-300 mt-1">Write metadata and content for your new prompt</p>
           </div>
           <div className="flex gap-2">
             <Button
@@ -123,7 +123,7 @@ Write your content using Markdown syntax:
 - *Italic text*
 - Lists and formatting"
                 />
-                <div className="flex items-center justify-between mt-4 text-xs text-muted-foreground">
+                <div className="flex items-center justify-between mt-4 text-xs text-zinc-500 dark:text-zinc-400">
                   <span>
                     Words: {content.split(/\s+/).filter(w => w.length > 0).length} |
                     Characters: {content.length}

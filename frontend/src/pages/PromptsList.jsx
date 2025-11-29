@@ -1,8 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { FileText, LayoutGrid, List, MoreVertical, Plus } from 'lucide-react'
+import { FileText, LayoutGrid, List, MoreVertical, Plus, ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
 import {
   Card,
@@ -18,13 +17,6 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select'
 import Breadcrumb from '@/components/layout/Breadcrumb'
 import useStore from '@/store/useStore'
 import { searchAPI, promptsAPI} from '@/lib/api'
@@ -35,56 +27,18 @@ export default function PromptsList() {
   const { viewMode, setViewMode } = useStore()
   const [prompts, setPrompts] = useState([])
   const [loading, setLoading] = useState(true)
-  const [filters, setFilters] = useState({
-    label: '',
-    author: '',
-  })
-  const [sortBy, setSortBy] = useState('updated_at') // 'title', 'author', 'updated_at'
-  const [sortOrder, setSortOrder] = useState('desc') // 'asc' or 'desc'
   const [currentPage, setCurrentPage] = useState(1)
-  const [itemsPerPage] = useState(10)
-  const [totalPages, setTotalPages] = useState(1)
+  const itemsPerPage = 10
 
   useEffect(() => {
     loadPrompts()
-  }, [filters, sortBy, sortOrder, currentPage])
+  }, [currentPage])
 
   const loadPrompts = async () => {
     try {
       setLoading(true)
-      const response = await promptsAPI.list({
-        labels: filters.label || undefined,
-        author: filters.author || undefined,
-      })
-      let items = response.items || []
-
-      // Client-side sorting
-      items.sort((a, b) => {
-        let aVal = a[sortBy]
-        let bVal = b[sortBy]
-
-        if (sortBy === 'title') {
-          aVal = (aVal || '').toLowerCase()
-          bVal = (bVal || '').toLowerCase()
-        } else if (sortBy === 'updated_at') {
-          aVal = new Date(aVal || 0).getTime()
-          bVal = new Date(bVal || 0).getTime()
-        }
-
-        if (sortOrder === 'asc') {
-          return aVal > bVal ? 1 : -1
-        } else {
-          return aVal < bVal ? 1 : -1
-        }
-      })
-
-      // Client-side pagination
-      const total = Math.ceil(items.length / itemsPerPage)
-      setTotalPages(total)
-      const startIndex = (currentPage - 1) * itemsPerPage
-      const paginatedItems = items.slice(startIndex, startIndex + itemsPerPage)
-
-      setPrompts(paginatedItems)
+      const response = await promptsAPI.list()
+      setPrompts(response.items || [])
     } catch (error) {
       console.error('Failed to load prompts:', error)
     } finally {
@@ -107,9 +61,9 @@ export default function PromptsList() {
           <div>
             <div className="flex items-center gap-3">
               <FileText className="w-8 h-8 text-teal-500" />
-              <h1 className="text-3xl font-bold text-zinc-900">Prompts</h1>
+              <h1 className="text-3xl font-bold text-foreground">Prompts</h1>
             </div>
-            <p className="text-zinc-600 mt-1">Manage your prompt templates and versions</p>
+            <p className="text-muted-foreground mt-1">Manage your prompt templates and versions</p>
           </div>
           <Button
             className="bg-teal-500 hover:bg-teal-600"
@@ -121,27 +75,8 @@ export default function PromptsList() {
         </div>
 
         {/* Toolbar */}
-        <div className="bg-white rounded-lg shadow-sm p-4 mb-6 space-y-4">
+        <div className="bg-card rounded-lg shadow-sm p-4 mb-6 border border-border">
           <div className="flex items-center justify-between gap-4">
-            {/* Filters */}
-            <div className="flex items-center gap-3 flex-1">
-              <Input
-                type="text"
-                placeholder="Filter by label..."
-                value={filters.label}
-                onChange={(e) => setFilters({ ...filters, label: e.target.value })}
-                className="w-[200px]"
-              />
-
-              <Input
-                type="text"
-                placeholder="Filter by author..."
-                value={filters.author}
-                onChange={(e) => setFilters({ ...filters, author: e.target.value })}
-                className="w-[200px]"
-              />
-            </div>
-
             {/* View Toggle */}
             <div className="flex items-center gap-2">
               <Button
@@ -159,109 +94,148 @@ export default function PromptsList() {
                 <LayoutGrid className="w-4 h-4" />
               </Button>
             </div>
-          </div>
 
-          {/* Sort and Pagination */}
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <Select value={sortBy} onValueChange={setSortBy}>
-                <SelectTrigger className="w-[180px]">
-                  <SelectValue placeholder="Sort by..." />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="title">Title</SelectItem>
-                  <SelectItem value="author">Creator</SelectItem>
-                  <SelectItem value="updated_at">Updated Time</SelectItem>
-                </SelectContent>
-              </Select>
-
-              <Select value={sortOrder} onValueChange={setSortOrder}>
-                <SelectTrigger className="w-[120px]">
-                  <SelectValue placeholder="Order" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="asc">Ascending</SelectItem>
-                  <SelectItem value="desc">Descending</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-
-            {/* Pagination Controls */}
-            <div className="flex items-center gap-2">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
-                disabled={currentPage === 1}
-              >
-                Previous
-              </Button>
-              <span className="text-sm text-zinc-600">
-                Page {currentPage} of {totalPages || 1}
-              </span>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setCurrentPage(Math.min(totalPages, currentPage + 1))}
-                disabled={currentPage >= totalPages}
-              >
-                Next
-              </Button>
-            </div>
           </div>
         </div>
 
         {/* Content */}
         {loading ? (
           <div className="flex items-center justify-center h-64">
-            <p className="text-zinc-500">Loading prompts...</p>
+            <p className="text-muted-foreground">Loading prompts...</p>
           </div>
         ) : viewMode === 'table' ? (
-          <TableView prompts={prompts} onSelect={(prompt) => navigate(`/prompts/${prompt.id}`)} navigate={navigate} />
+          <TableView
+            prompts={prompts}
+            onSelect={(prompt) => navigate(`/prompts/${prompt.id}`)}
+            navigate={navigate}
+            currentPage={currentPage}
+            setCurrentPage={setCurrentPage}
+            itemsPerPage={itemsPerPage}
+          />
         ) : (
-          <CardsView prompts={prompts} onSelect={(prompt) => navigate(`/prompts/${prompt.id}`)} navigate={navigate} />
+          <CardsView
+            prompts={prompts}
+            onSelect={(prompt) => navigate(`/prompts/${prompt.id}`)}
+            navigate={navigate}
+            currentPage={currentPage}
+            setCurrentPage={setCurrentPage}
+            itemsPerPage={itemsPerPage}
+          />
         )}
       </div>
     </div>
   )
 }
 
-function TableView({ prompts, onSelect, navigate }) {
+function TableView({ prompts, onSelect, navigate, currentPage, setCurrentPage, itemsPerPage }) {
+  const [sortBy, setSortBy] = useState('updated_at')
+  const [sortOrder, setSortOrder] = useState('desc')
+
+  const handleSort = (field) => {
+    if (sortBy === field) {
+      setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc')
+    } else {
+      setSortBy(field)
+      setSortOrder('asc')
+    }
+  }
+
+  const getSortIcon = (field) => {
+    if (sortBy !== field) {
+      return <ArrowUpDown className="w-3 h-3 ml-1 opacity-50" />
+    }
+    return sortOrder === 'asc' ?
+      <ArrowUp className="w-3 h-3 ml-1" /> :
+      <ArrowDown className="w-3 h-3 ml-1" />
+  }
+
+  // Sort prompts
+  const sortedPrompts = [...prompts].sort((a, b) => {
+    let aVal = a[sortBy]
+    let bVal = b[sortBy]
+
+    if (sortBy === 'title' || sortBy === 'author') {
+      aVal = (aVal || '').toLowerCase()
+      bVal = (bVal || '').toLowerCase()
+    } else if (sortBy === 'updated_at') {
+      aVal = new Date(aVal || 0).getTime()
+      bVal = new Date(bVal || 0).getTime()
+    } else if (sortBy === 'labels') {
+      aVal = (a.labels?.[0] || '').toLowerCase()
+      bVal = (b.labels?.[0] || '').toLowerCase()
+    }
+
+    if (sortOrder === 'asc') {
+      return aVal > bVal ? 1 : -1
+    } else {
+      return aVal < bVal ? 1 : -1
+    }
+  })
+
+  // Paginate
+  const totalPages = Math.ceil(sortedPrompts.length / itemsPerPage)
+  const startIndex = (currentPage - 1) * itemsPerPage
+  const paginatedPrompts = sortedPrompts.slice(startIndex, startIndex + itemsPerPage)
+
   return (
-    <div className="bg-white rounded-lg shadow-sm overflow-hidden">
+    <div className="bg-card rounded-lg shadow-sm overflow-hidden border border-border">
       <table className="w-full">
-        <thead className="bg-zinc-50 border-b">
+        <thead className="bg-muted border-b border-border">
           <tr>
-            <th className="text-left px-6 py-3 text-xs font-semibold text-zinc-600 uppercase tracking-wide">
-              Title
+            <th
+              className="text-left px-6 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wide cursor-pointer hover:bg-muted/80 transition-colors"
+              onClick={() => handleSort('title')}
+            >
+              <div className="flex items-center">
+                Title
+                {getSortIcon('title')}
+              </div>
             </th>
-            <th className="text-left px-6 py-3 text-xs font-semibold text-zinc-600 uppercase tracking-wide">
-              Labels
+            <th
+              className="text-left px-6 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wide cursor-pointer hover:bg-muted/80 transition-colors"
+              onClick={() => handleSort('labels')}
+            >
+              <div className="flex items-center">
+                Labels
+                {getSortIcon('labels')}
+              </div>
             </th>
-            <th className="text-left px-6 py-3 text-xs font-semibold text-zinc-600 uppercase tracking-wide">
-              Updated
+            <th
+              className="text-left px-6 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wide cursor-pointer hover:bg-muted/80 transition-colors"
+              onClick={() => handleSort('updated_at')}
+            >
+              <div className="flex items-center">
+                Updated
+                {getSortIcon('updated_at')}
+              </div>
             </th>
-            <th className="text-left px-6 py-3 text-xs font-semibold text-zinc-600 uppercase tracking-wide">
-              Author
+            <th
+              className="text-left px-6 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wide cursor-pointer hover:bg-muted/80 transition-colors"
+              onClick={() => handleSort('author')}
+            >
+              <div className="flex items-center">
+                Author
+                {getSortIcon('author')}
+              </div>
             </th>
-            <th className="text-right px-6 py-3 text-xs font-semibold text-zinc-600 uppercase tracking-wide">
+            <th className="text-right px-6 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wide">
               Actions
             </th>
           </tr>
         </thead>
-        <tbody className="divide-y">
-          {prompts.map((prompt) => (
+        <tbody className="divide-y divide-border">
+          {paginatedPrompts.map((prompt) => (
             <tr
               key={prompt.id}
-              className="hover:bg-zinc-50 transition-colors duration-200 cursor-pointer"
+              className="hover:bg-muted/60 transition-colors duration-200 cursor-pointer"
               onClick={() => onSelect(prompt)}
             >
               <td className="px-6 py-4">
                 <div className="flex items-center gap-3">
                   <FileText className="w-5 h-5 text-teal-500" />
                   <div>
-                    <p className="font-semibold text-zinc-900">{prompt.title}</p>
-                    <p className="text-xs text-zinc-500">{prompt.slug}</p>
+                    <p className="font-semibold text-foreground">{prompt.title}</p>
+                    <p className="text-xs text-muted-foreground">{prompt.slug}</p>
                   </div>
                 </div>
               </td>
@@ -277,10 +251,10 @@ function TableView({ prompts, onSelect, navigate }) {
                   )}
                 </div>
               </td>
-              <td className="px-6 py-4 text-sm text-zinc-600">
+              <td className="px-6 py-4 text-sm text-muted-foreground">
                 {formatDate(prompt.updated_at)}
               </td>
-              <td className="px-6 py-4 text-sm text-zinc-600">
+              <td className="px-6 py-4 text-sm text-muted-foreground">
                 @{prompt.author}
               </td>
               <td className="px-6 py-4 text-right">
@@ -303,18 +277,78 @@ function TableView({ prompts, onSelect, navigate }) {
         </tbody>
       </table>
       {prompts.length === 0 && (
-        <div className="text-center py-12 text-zinc-500">
+        <div className="text-center py-12 text-muted-foreground">
           No prompts found. Create your first prompt to get started!
+        </div>
+      )}
+        {prompts.length > 0 && (
+        <div className="border-t border-border p-4 flex items-center justify-between">
+          <div className="text-sm text-muted-foreground">
+            Showing {startIndex + 1} to {Math.min(startIndex + itemsPerPage, sortedPrompts.length)} of {sortedPrompts.length} prompts
+          </div>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
+              disabled={currentPage === 1}
+            >
+              Previous
+            </Button>
+            <span className="text-sm text-muted-foreground">
+              Page {currentPage} of {totalPages || 1}
+            </span>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setCurrentPage(Math.min(totalPages, currentPage + 1))}
+              disabled={currentPage >= totalPages}
+            >
+              Next
+            </Button>
+          </div>
         </div>
       )}
     </div>
   )
 }
 
-function CardsView({ prompts, onSelect, navigate }) {
+function CardsView({ prompts, onSelect, navigate, currentPage, setCurrentPage, itemsPerPage }) {
+  const [sortBy, setSortBy] = useState('updated_at')
+  const [sortOrder, setSortOrder] = useState('desc')
+
+  // Sort prompts
+  const sortedPrompts = [...prompts].sort((a, b) => {
+    let aVal = a[sortBy]
+    let bVal = b[sortBy]
+
+    if (sortBy === 'title' || sortBy === 'author') {
+      aVal = (aVal || '').toLowerCase()
+      bVal = (bVal || '').toLowerCase()
+    } else if (sortBy === 'updated_at') {
+      aVal = new Date(aVal || 0).getTime()
+      bVal = new Date(bVal || 0).getTime()
+    } else if (sortBy === 'labels') {
+      aVal = (a.labels?.[0] || '').toLowerCase()
+      bVal = (b.labels?.[0] || '').toLowerCase()
+    }
+
+    if (sortOrder === 'asc') {
+      return aVal > bVal ? 1 : -1
+    } else {
+      return aVal < bVal ? 1 : -1
+    }
+  })
+
+  // Paginate
+  const totalPages = Math.ceil(sortedPrompts.length / itemsPerPage)
+  const startIndex = (currentPage - 1) * itemsPerPage
+  const paginatedPrompts = sortedPrompts.slice(startIndex, startIndex + itemsPerPage)
+
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-      {prompts.map((prompt) => (
+    <>
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        {paginatedPrompts.map((prompt) => (
         <Card
           key={prompt.id}
           className="hover:shadow-md transition-shadow duration-200 cursor-pointer"
@@ -353,7 +387,7 @@ function CardsView({ prompts, onSelect, navigate }) {
             <div className="mt-4 flex justify-between items-center">
               {prompt.latestRelease ? (
                 <div className="flex items-center gap-2">
-                  <span className="text-xs text-zinc-500 font-mono">
+                  <span className="text-xs text-muted-foreground font-mono">
                     {prompt.latestRelease.version}
                   </span>
                   <Badge variant="outline" className="text-xs">
@@ -361,22 +395,51 @@ function CardsView({ prompts, onSelect, navigate }) {
                   </Badge>
                 </div>
               ) : (
-                <span className="text-xs text-zinc-400">No releases</span>
+                <span className="text-xs text-muted-foreground">No releases</span>
               )}
             </div>
           </CardContent>
-          <CardFooter className="text-xs text-zinc-500">
+          <CardFooter className="text-xs text-muted-foreground">
             <span>Updated {formatDate(prompt.updated_at)}</span>
             <span className="mx-2">•</span>
             <span>@{prompt.author}</span>
           </CardFooter>
         </Card>
-      ))}
-      {prompts.length === 0 && (
-        <div className="col-span-full text-center py-12 text-zinc-500">
-          No prompts found. Create your first prompt to get started!
+        ))}
+        {prompts.length === 0 && (
+          <div className="col-span-full text-center py-12 text-muted-foreground">
+            No prompts found. Create your first prompt to get started!
+          </div>
+        )}
+      </div>
+      {prompts.length > 0 && (
+        <div className="mt-6 bg-card rounded-lg shadow-sm p-4 flex items-center justify-between border border-border">
+          <div className="text-sm text-muted-foreground">
+            Showing {startIndex + 1} to {Math.min(startIndex + itemsPerPage, sortedPrompts.length)} of {sortedPrompts.length} prompts
+          </div>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
+              disabled={currentPage === 1}
+            >
+              Previous
+            </Button>
+            <span className="text-sm text-muted-foreground">
+              Page {currentPage} of {totalPages || 1}
+            </span>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setCurrentPage(Math.min(totalPages, currentPage + 1))}
+              disabled={currentPage >= totalPages}
+            >
+              Next
+            </Button>
+          </div>
         </div>
       )}
-    </div>
+    </>
   )
 }

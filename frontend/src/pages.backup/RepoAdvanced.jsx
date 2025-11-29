@@ -22,8 +22,8 @@ export default function RepoAdvanced() {
 
       <div className="max-w-7xl mx-auto px-8 py-12">
         <div className="mb-8">
-          <h1 className="text-4xl font-bold text-foreground mb-2">Repository</h1>
-          <p className="text-muted-foreground">Advanced Git operations for your prompts</p>
+          <h1 className="text-4xl font-bold text-zinc-900 dark:text-zinc-100 mb-2">Repository</h1>
+          <p className="text-zinc-600 dark:text-zinc-300">Advanced Git operations for your prompts</p>
         </div>
 
         <Tabs defaultValue="branches" className="w-full">
@@ -83,12 +83,12 @@ function BranchesTab() {
       <CardContent>
         <div className="overflow-x-auto">
           <table className="w-full">
-            <thead className="bg-muted border-b border-border">
+            <thead className="bg-zinc-50 dark:bg-zinc-800 border-b dark:border-zinc-700">
               <tr>
-                <th className="text-left px-4 py-3 text-xs font-semibold text-muted-foreground uppercase">Branch</th>
-                <th className="text-left px-4 py-3 text-xs font-semibold text-muted-foreground uppercase">Latest Commit</th>
-                <th className="text-left px-4 py-3 text-xs font-semibold text-muted-foreground uppercase">Ahead/Behind</th>
-                <th className="text-right px-4 py-3 text-xs font-semibold text-muted-foreground uppercase">Actions</th>
+                <th className="text-left px-4 py-3 text-xs font-semibold text-zinc-600 dark:text-zinc-300 uppercase">Branch</th>
+                <th className="text-left px-4 py-3 text-xs font-semibold text-zinc-600 dark:text-zinc-300 uppercase">Latest Commit</th>
+                <th className="text-left px-4 py-3 text-xs font-semibold text-zinc-600 dark:text-zinc-300 uppercase">Ahead/Behind</th>
+                <th className="text-right px-4 py-3 text-xs font-semibold text-zinc-600 dark:text-zinc-300 uppercase">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y dark:divide-zinc-700">
@@ -97,7 +97,7 @@ function BranchesTab() {
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-2">
                       <GitBranch className="w-4 h-4 text-teal-500" />
-                      <span className="font-semibold text-foreground">{branch.name}</span>
+                      <span className="font-semibold text-zinc-900 dark:text-zinc-100">{branch.name}</span>
                       {branch.name === 'main' && (
                         <Badge variant="outline" className="text-xs">default</Badge>
                       )}
@@ -108,12 +108,12 @@ function BranchesTab() {
                       <code className="text-xs font-mono bg-zinc-100 dark:bg-zinc-800 px-2 py-1 rounded dark:text-zinc-100">
                         {branch.commit}
                       </code>
-                      <p className="text-xs text-muted-foreground mt-1">{branch.message}</p>
+                      <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-1">{branch.message}</p>
                     </div>
                   </td>
                   <td className="px-4 py-3">
                     {branch.ahead > 0 || branch.behind > 0 ? (
-                      <span className="text-sm text-muted-foreground">
+                      <span className="text-sm text-zinc-600 dark:text-zinc-300">
                         {branch.ahead > 0 && `+${branch.ahead}`}
                         {branch.ahead > 0 && branch.behind > 0 && ' / '}
                         {branch.behind > 0 && `-${branch.behind}`}
@@ -164,16 +164,16 @@ function TagsTab() {
           <div key={tag.namespace} className="border dark:border-zinc-700 rounded-lg p-4">
             <div className="flex items-center gap-2 mb-3">
               <Tag className="w-4 h-4 text-teal-500" />
-              <span className="font-semibold text-foreground">{tag.namespace}</span>
+              <span className="font-semibold text-zinc-900 dark:text-zinc-100">{tag.namespace}</span>
             </div>
             <div className="space-y-2 ml-6">
               {tag.versions.map((version) => (
-                <div key={version} className="flex items-center justify-between py-2 border-b border-border last:border-0">
+                <div key={version} className="flex items-center justify-between py-2 border-b dark:border-zinc-700 last:border-0">
                   <div className="flex items-center gap-3">
                     <Badge variant="outline" className="font-mono">
                       {version}
                     </Badge>
-                    <span className="text-sm text-muted-foreground">2h ago</span>
+                    <span className="text-sm text-zinc-500 dark:text-zinc-400">2h ago</span>
                   </div>
                   <div className="space-x-2">
                     <Button variant="ghost" size="sm">View</Button>

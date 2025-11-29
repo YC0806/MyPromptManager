@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { FileCode, LayoutGrid, List, MoreVertical, Plus, ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react'
+import { FileText, LayoutGrid, List, MoreVertical, Plus, ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import {
@@ -19,30 +19,28 @@ import {
 } from '@/components/ui/dropdown-menu'
 import Breadcrumb from '@/components/layout/Breadcrumb'
 import useStore from '@/store/useStore'
-import { templatesAPI } from '@/lib/api'
-import { formatDate, getLabelColor } from '@/lib/utils'
+import { searchAPI, promptsAPI} from '@/lib/api'
+import { formatDate, getLabelColor, getStatusColor } from '@/lib/utils'
 
-export default function TemplatesList() {
+export default function PromptsList() {
   const navigate = useNavigate()
   const { viewMode, setViewMode } = useStore()
-  const [templates, setTemplates] = useState([])
+  const [prompts, setPrompts] = useState([])
   const [loading, setLoading] = useState(true)
   const [currentPage, setCurrentPage] = useState(1)
   const itemsPerPage = 10
 
   useEffect(() => {
-    loadTemplates()
+    loadPrompts()
   }, [currentPage])
 
-  const loadTemplates = async () => {
+  const loadPrompts = async () => {
     try {
       setLoading(true)
-      const response = await templatesAPI.list({
-        type: 'template',
-      })
-      setTemplates(response.items || [])
+      const response = await promptsAPI.list()
+      setPrompts(response.items || [])
     } catch (error) {
-      console.error('Failed to load templates:', error)
+      console.error('Failed to load prompts:', error)
     } finally {
       setLoading(false)
     }
@@ -50,7 +48,7 @@ export default function TemplatesList() {
 
   const breadcrumbItems = [
     { label: 'Home', href: '/' },
-    { label: 'Templates' },
+    { label: 'Prompts' },
   ]
 
   return (
@@ -58,26 +56,26 @@ export default function TemplatesList() {
       <Breadcrumb items={breadcrumbItems} />
 
       <div className="max-w-7xl mx-auto px-8 py-8">
-        {/* Page Header */}
+        {/* Page Header */}        
         <div className="flex items-center justify-between mb-8">
           <div>
             <div className="flex items-center gap-3">
-              <FileCode className="w-8 h-8 text-purple-500" />
-              <h1 className="text-3xl font-bold text-foreground">Templates</h1>
+              <FileText className="w-8 h-8 text-teal-500" />
+              <h1 className="text-3xl font-bold text-zinc-900">Prompts</h1>
             </div>
-            <p className="text-muted-foreground mt-1">Manage your reusable template files with variables</p>
+            <p className="text-zinc-600 mt-1">Manage your prompt templates and versions</p>
           </div>
           <Button
-            className="bg-purple-500 hover:bg-purple-600"
-            onClick={() => navigate('/templates/create')}
+            className="bg-teal-500 hover:bg-teal-600"
+            onClick={() => navigate('/prompts/create')}
           >
             <Plus className="w-4 h-4 mr-2" />
-            New Template
+            New Prompt
           </Button>
         </div>
 
         {/* Toolbar */}
-        <div className="bg-card rounded-lg shadow-sm p-4 mb-6 border border-border">
+        <div className="bg-white dark:bg-zinc-900 rounded-lg shadow-sm p-4 mb-6 border dark:border-zinc-800">
           <div className="flex items-center justify-between gap-4">
             {/* View Toggle */}
             <div className="flex items-center gap-2">
@@ -96,26 +94,29 @@ export default function TemplatesList() {
                 <LayoutGrid className="w-4 h-4" />
               </Button>
             </div>
+
           </div>
         </div>
 
         {/* Content */}
         {loading ? (
           <div className="flex items-center justify-center h-64">
-            <p className="text-muted-foreground">Loading templates...</p>
+            <p className="text-zinc-500">Loading prompts...</p>
           </div>
         ) : viewMode === 'table' ? (
           <TableView
-            templates={templates}
-            onSelect={(template) => navigate(`/templates/${template.id}`)}
+            prompts={prompts}
+            onSelect={(prompt) => navigate(`/prompts/${prompt.id}`)}
+            navigate={navigate}
             currentPage={currentPage}
             setCurrentPage={setCurrentPage}
             itemsPerPage={itemsPerPage}
           />
         ) : (
           <CardsView
-            templates={templates}
-            onSelect={(template) => navigate(`/templates/${template.id}`)}
+            prompts={prompts}
+            onSelect={(prompt) => navigate(`/prompts/${prompt.id}`)}
+            navigate={navigate}
             currentPage={currentPage}
             setCurrentPage={setCurrentPage}
             itemsPerPage={itemsPerPage}
@@ -126,7 +127,7 @@ export default function TemplatesList() {
   )
 }
 
-function TableView({ templates, onSelect, currentPage, setCurrentPage, itemsPerPage }) {
+function TableView({ prompts, onSelect, navigate, currentPage, setCurrentPage, itemsPerPage }) {
   const [sortBy, setSortBy] = useState('updated_at')
   const [sortOrder, setSortOrder] = useState('desc')
 
@@ -148,8 +149,8 @@ function TableView({ templates, onSelect, currentPage, setCurrentPage, itemsPerP
       <ArrowDown className="w-3 h-3 ml-1" />
   }
 
-  // Sort templates
-  const sortedTemplates = [...templates].sort((a, b) => {
+  // Sort prompts
+  const sortedPrompts = [...prompts].sort((a, b) => {
     let aVal = a[sortBy]
     let bVal = b[sortBy]
 
@@ -172,17 +173,17 @@ function TableView({ templates, onSelect, currentPage, setCurrentPage, itemsPerP
   })
 
   // Paginate
-  const totalPages = Math.ceil(sortedTemplates.length / itemsPerPage)
+  const totalPages = Math.ceil(sortedPrompts.length / itemsPerPage)
   const startIndex = (currentPage - 1) * itemsPerPage
-  const paginatedTemplates = sortedTemplates.slice(startIndex, startIndex + itemsPerPage)
+  const paginatedPrompts = sortedPrompts.slice(startIndex, startIndex + itemsPerPage)
 
   return (
-    <div className="bg-card rounded-lg shadow-sm overflow-hidden border border-border">
+    <div className="bg-white dark:bg-zinc-900 rounded-lg shadow-sm overflow-hidden border dark:border-zinc-800">
       <table className="w-full">
-        <thead className="bg-muted border-b border-border">
+        <thead className="bg-zinc-50 dark:bg-zinc-800 border-b dark:border-zinc-700">
           <tr>
             <th
-              className="text-left px-6 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wide cursor-pointer hover:bg-muted/80 transition-colors"
+              className="text-left px-6 py-3 text-xs font-semibold text-zinc-600 dark:text-zinc-300 uppercase tracking-wide cursor-pointer hover:bg-zinc-100 dark:hover:bg-zinc-700 transition-colors"
               onClick={() => handleSort('title')}
             >
               <div className="flex items-center">
@@ -191,7 +192,7 @@ function TableView({ templates, onSelect, currentPage, setCurrentPage, itemsPerP
               </div>
             </th>
             <th
-              className="text-left px-6 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wide cursor-pointer hover:bg-muted/80 transition-colors"
+              className="text-left px-6 py-3 text-xs font-semibold text-zinc-600 dark:text-zinc-300 uppercase tracking-wide cursor-pointer hover:bg-zinc-100 dark:hover:bg-zinc-700 transition-colors"
               onClick={() => handleSort('labels')}
             >
               <div className="flex items-center">
@@ -200,7 +201,7 @@ function TableView({ templates, onSelect, currentPage, setCurrentPage, itemsPerP
               </div>
             </th>
             <th
-              className="text-left px-6 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wide cursor-pointer hover:bg-muted/80 transition-colors"
+              className="text-left px-6 py-3 text-xs font-semibold text-zinc-600 dark:text-zinc-300 uppercase tracking-wide cursor-pointer hover:bg-zinc-100 dark:hover:bg-zinc-700 transition-colors"
               onClick={() => handleSort('updated_at')}
             >
               <div className="flex items-center">
@@ -209,52 +210,52 @@ function TableView({ templates, onSelect, currentPage, setCurrentPage, itemsPerP
               </div>
             </th>
             <th
-              className="text-left px-6 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wide cursor-pointer hover:bg-muted/80 transition-colors"
+              className="text-left px-6 py-3 text-xs font-semibold text-zinc-600 dark:text-zinc-300 uppercase tracking-wide cursor-pointer hover:bg-zinc-100 dark:hover:bg-zinc-700 transition-colors"
               onClick={() => handleSort('author')}
             >
               <div className="flex items-center">
-                Creator
+                Author
                 {getSortIcon('author')}
               </div>
             </th>
-            <th className="text-right px-6 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+            <th className="text-right px-6 py-3 text-xs font-semibold text-zinc-600 dark:text-zinc-300 uppercase tracking-wide">
               Actions
             </th>
           </tr>
         </thead>
-        <tbody className="divide-y divide-border">
-          {paginatedTemplates.map((template) => (
+        <tbody className="divide-y dark:divide-zinc-800">
+          {paginatedPrompts.map((prompt) => (
             <tr
-              key={template.id}
-              className="hover:bg-muted/60 transition-colors duration-200 cursor-pointer"
-              onClick={() => onSelect(template)}
+              key={prompt.id}
+              className="hover:bg-zinc-50 dark:hover:bg-zinc-800 transition-colors duration-200 cursor-pointer"
+              onClick={() => onSelect(prompt)}
             >
               <td className="px-6 py-4">
                 <div className="flex items-center gap-3">
-                  <FileCode className="w-5 h-5 text-purple-500" />
+                  <FileText className="w-5 h-5 text-teal-500" />
                   <div>
-                    <p className="font-semibold text-foreground">{template.title}</p>
-                    <p className="text-xs text-muted-foreground">{template.slug}</p>
+                    <p className="font-semibold text-zinc-900 dark:text-zinc-100">{prompt.title}</p>
+                    <p className="text-xs text-zinc-500 dark:text-zinc-400">{prompt.slug}</p>
                   </div>
                 </div>
               </td>
               <td className="px-6 py-4">
                 <div className="flex gap-1 flex-wrap">
-                  {template.labels?.slice(0, 3).map((label, idx) => (
+                  {prompt.labels?.slice(0, 3).map((label, idx) => (
                     <Badge key={idx} className={getLabelColor(idx)}>
                       {label}
                     </Badge>
                   ))}
-                  {template.labels?.length > 3 && (
-                    <Badge variant="outline">+{template.labels.length - 3}</Badge>
+                  {prompt.labels?.length > 3 && (
+                    <Badge variant="outline">+{prompt.labels.length - 3}</Badge>
                   )}
                 </div>
               </td>
-              <td className="px-6 py-4 text-sm text-muted-foreground">
-                {formatDate(template.updated_at)}
+              <td className="px-6 py-4 text-sm text-zinc-600 dark:text-zinc-300">
+                {formatDate(prompt.updated_at)}
               </td>
-              <td className="px-6 py-4 text-sm text-muted-foreground">
-                @{template.author}
+              <td className="px-6 py-4 text-sm text-zinc-600 dark:text-zinc-300">
+                @{prompt.author}
               </td>
               <td className="px-6 py-4 text-right">
                 <DropdownMenu>
@@ -264,8 +265,10 @@ function TableView({ templates, onSelect, currentPage, setCurrentPage, itemsPerP
                     </Button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end">
-                    <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onSelect(template); }}>Open</DropdownMenuItem>
-                    <DropdownMenuItem onClick={(e) => e.stopPropagation()}>Delete</DropdownMenuItem>
+                    <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onSelect(prompt); }}>Open</DropdownMenuItem>
+                    <DropdownMenuItem onClick={(e) => { e.stopPropagation(); navigate(`/prompts/${prompt.id}/compare`); }}>Compare</DropdownMenuItem>
+                    <DropdownMenuItem onClick={(e) => { e.stopPropagation(); /* TODO: Add publish modal */ }}>Publish</DropdownMenuItem>
+                    <DropdownMenuItem onClick={(e) => { e.stopPropagation(); /* TODO: Add rollback modal */ }}>Rollback</DropdownMenuItem>
                   </DropdownMenuContent>
                 </DropdownMenu>
               </td>
@@ -273,15 +276,15 @@ function TableView({ templates, onSelect, currentPage, setCurrentPage, itemsPerP
           ))}
         </tbody>
       </table>
-      {templates.length === 0 && (
-        <div className="text-center py-12 text-muted-foreground">
-          No templates found. Create your first template to get started!
+      {prompts.length === 0 && (
+        <div className="text-center py-12 text-zinc-500 dark:text-zinc-400">
+          No prompts found. Create your first prompt to get started!
         </div>
       )}
-      {templates.length > 0 && (
-        <div className="border-t border-border p-4 flex items-center justify-between">
-          <div className="text-sm text-muted-foreground">
-            Showing {startIndex + 1} to {Math.min(startIndex + itemsPerPage, sortedTemplates.length)} of {sortedTemplates.length} templates
+      {prompts.length > 0 && (
+        <div className="border-t dark:border-zinc-800 p-4 flex items-center justify-between">
+          <div className="text-sm text-zinc-600 dark:text-zinc-300">
+            Showing {startIndex + 1} to {Math.min(startIndex + itemsPerPage, sortedPrompts.length)} of {sortedPrompts.length} prompts
           </div>
           <div className="flex items-center gap-2">
             <Button
@@ -292,7 +295,7 @@ function TableView({ templates, onSelect, currentPage, setCurrentPage, itemsPerP
             >
               Previous
             </Button>
-            <span className="text-sm text-muted-foreground">
+            <span className="text-sm text-zinc-600">
               Page {currentPage} of {totalPages || 1}
             </span>
             <Button
@@ -310,12 +313,12 @@ function TableView({ templates, onSelect, currentPage, setCurrentPage, itemsPerP
   )
 }
 
-function CardsView({ templates, onSelect, currentPage, setCurrentPage, itemsPerPage }) {
+function CardsView({ prompts, onSelect, navigate, currentPage, setCurrentPage, itemsPerPage }) {
   const [sortBy, setSortBy] = useState('updated_at')
   const [sortOrder, setSortOrder] = useState('desc')
 
-  // Sort templates
-  const sortedTemplates = [...templates].sort((a, b) => {
+  // Sort prompts
+  const sortedPrompts = [...prompts].sort((a, b) => {
     let aVal = a[sortBy]
     let bVal = b[sortBy]
 
@@ -338,22 +341,22 @@ function CardsView({ templates, onSelect, currentPage, setCurrentPage, itemsPerP
   })
 
   // Paginate
-  const totalPages = Math.ceil(sortedTemplates.length / itemsPerPage)
+  const totalPages = Math.ceil(sortedPrompts.length / itemsPerPage)
   const startIndex = (currentPage - 1) * itemsPerPage
-  const paginatedTemplates = sortedTemplates.slice(startIndex, startIndex + itemsPerPage)
+  const paginatedPrompts = sortedPrompts.slice(startIndex, startIndex + itemsPerPage)
 
   return (
     <>
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {paginatedTemplates.map((template) => (
+        {paginatedPrompts.map((prompt) => (
         <Card
-          key={template.id}
-          className="hover:shadow-md transition-shadow duration-200 cursor-pointer"
-          onClick={() => onSelect(template)}
+          key={prompt.id}
+          className="hover:shadow-md transition-shadow duration-200 cursor-pointer dark:bg-zinc-900 dark:border-zinc-800"
+          onClick={() => onSelect(prompt)}
         >
           <CardHeader>
             <div className="flex items-start justify-between">
-              <FileCode className="w-8 h-8 text-purple-500" />
+              <FileText className="w-8 h-8 text-teal-500" />
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button variant="ghost" size="icon" onClick={(e) => e.stopPropagation()}>
@@ -361,14 +364,16 @@ function CardsView({ templates, onSelect, currentPage, setCurrentPage, itemsPerP
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end">
-                  <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onSelect(template); }}>Open</DropdownMenuItem>
-                  <DropdownMenuItem onClick={(e) => e.stopPropagation()}>Delete</DropdownMenuItem>
+                  <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onSelect(prompt); }}>Open</DropdownMenuItem>
+                  <DropdownMenuItem onClick={(e) => { e.stopPropagation(); navigate(`/prompts/${prompt.id}/compare`); }}>Compare</DropdownMenuItem>
+                  <DropdownMenuItem onClick={(e) => { e.stopPropagation(); /* TODO: Add publish modal */ }}>Publish</DropdownMenuItem>
+                  <DropdownMenuItem onClick={(e) => { e.stopPropagation(); /* TODO: Add rollback modal */ }}>Rollback</DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
             </div>
-            <CardTitle className="mt-2">{template.title}</CardTitle>
+            <CardTitle className="mt-2">{prompt.title}</CardTitle>
             <div className="flex gap-2 mt-2 flex-wrap">
-              {template.labels?.slice(0, 3).map((label, idx) => (
+              {prompt.labels?.slice(0, 3).map((label, idx) => (
                 <Badge key={idx} className={getLabelColor(idx)}>
                   {label}
                 </Badge>
@@ -377,26 +382,40 @@ function CardsView({ templates, onSelect, currentPage, setCurrentPage, itemsPerP
           </CardHeader>
           <CardContent>
             <CardDescription className="line-clamp-2">
-              {template.description || 'No description'}
+              {prompt.description || 'No description'}
             </CardDescription>
+            <div className="mt-4 flex justify-between items-center">
+              {prompt.latestRelease ? (
+                <div className="flex items-center gap-2">
+                  <span className="text-xs text-zinc-500 dark:text-zinc-400 font-mono">
+                    {prompt.latestRelease.version}
+                  </span>
+                  <Badge variant="outline" className="text-xs">
+                    {prompt.latestRelease.channel}
+                  </Badge>
+                </div>
+              ) : (
+                <span className="text-xs text-zinc-400">No releases</span>
+              )}
+            </div>
           </CardContent>
-          <CardFooter className="text-xs text-muted-foreground">
-            <span>Updated {formatDate(template.updated_at)}</span>
+          <CardFooter className="text-xs text-zinc-500 dark:text-zinc-400">
+            <span>Updated {formatDate(prompt.updated_at)}</span>
             <span className="mx-2">•</span>
-            <span>@{template.author}</span>
+            <span>@{prompt.author}</span>
           </CardFooter>
         </Card>
         ))}
-        {templates.length === 0 && (
-          <div className="col-span-full text-center py-12 text-muted-foreground">
-            No templates found. Create your first template to get started!
+        {prompts.length === 0 && (
+          <div className="col-span-full text-center py-12 text-zinc-500 dark:text-zinc-400">
+            No prompts found. Create your first prompt to get started!
           </div>
         )}
       </div>
-      {templates.length > 0 && (
-        <div className="mt-6 bg-card rounded-lg shadow-sm p-4 flex items-center justify-between border border-border">
-          <div className="text-sm text-muted-foreground">
-            Showing {startIndex + 1} to {Math.min(startIndex + itemsPerPage, sortedTemplates.length)} of {sortedTemplates.length} templates
+      {prompts.length > 0 && (
+        <div className="mt-6 bg-white dark:bg-zinc-900 rounded-lg shadow-sm p-4 flex items-center justify-between border dark:border-zinc-800">
+          <div className="text-sm text-zinc-600 dark:text-zinc-300">
+            Showing {startIndex + 1} to {Math.min(startIndex + itemsPerPage, sortedPrompts.length)} of {sortedPrompts.length} prompts
           </div>
           <div className="flex items-center gap-2">
             <Button
@@ -407,7 +426,7 @@ function CardsView({ templates, onSelect, currentPage, setCurrentPage, itemsPerP
             >
               Previous
             </Button>
-            <span className="text-sm text-muted-foreground">
+            <span className="text-sm text-zinc-600 dark:text-zinc-300">
               Page {currentPage} of {totalPages || 1}
             </span>
             <Button

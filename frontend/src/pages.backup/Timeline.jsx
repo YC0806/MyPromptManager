@@ -72,8 +72,8 @@ export default function Timeline() {
         {/* Header */}
         <div className="flex items-center justify-between mb-8">
           <div>
-            <h1 className="text-4xl font-bold text-foreground mb-2">Timeline</h1>
-            <p className="text-muted-foreground">View all releases and activity across your prompts</p>
+            <h1 className="text-4xl font-bold text-zinc-900 dark:text-zinc-100 mb-2">Timeline</h1>
+            <p className="text-zinc-600 dark:text-zinc-300">View all releases and activity across your prompts</p>
           </div>
           <Button
             variant={filterReleasesOnly ? 'default' : 'outline'}
@@ -86,7 +86,7 @@ export default function Timeline() {
         {/* Timeline Content */}
         {loading ? (
           <div className="flex items-center justify-center h-64">
-            <p className="text-muted-foreground">Loading timeline...</p>
+            <p className="text-zinc-500 dark:text-zinc-400">Loading timeline...</p>
           </div>
         ) : (
           <div className="space-y-8">
@@ -151,7 +151,7 @@ function TimelineEvent({ event, isLast }) {
         </CardHeader>
         {isRelease && event.notes && (
           <CardContent>
-            <p className="text-sm text-muted-foreground">{event.notes}</p>
+            <p className="text-sm text-zinc-600 dark:text-zinc-300">{event.notes}</p>
           </CardContent>
         )}
         <CardFooter>
