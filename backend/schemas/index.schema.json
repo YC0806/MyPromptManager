@@ -4,7 +4,7 @@
   "title": "Prompt Manager Index",
   "description": "JSON Schema for index.json cache file",
   "type": "object",
-  "required": ["prompts", "templates"],
+  "required": ["prompts", "templates", "chats"],
   "properties": {
     "prompts": {
       "type": "array",
@@ -20,10 +20,21 @@
         "$ref": "#/definitions/IndexEntry"
       }
     },
+    "chats": {
+      "type": "array",
+      "description": "List of indexed chats",
+      "items": {
+        "$ref": "#/definitions/IndexEntry"
+      }
+    },
     "last_updated": {
       "type": "string",
       "description": "Last index update timestamp",
       "format": "date-time"
+    },
+    "last_error": {
+      "description": "Last index error message (if any)",
+      "type": ["string", "null"]
     }
   },
   "definitions": {
@@ -35,6 +46,11 @@
           "type": "string",
           "description": "ULID identifier",
           "pattern": "^[0-9A-HJKMNP-TV-Z]{26}$"
+        },
+        "type": {
+          "type": "string",
+          "description": "Resource type",
+          "enum": ["prompt", "template", "chat"]
         },
         "title": {
           "type": "string",
@@ -76,6 +92,34 @@
         "sha": {
           "type": "string",
           "description": "Git blob SHA"
+        },
+        "version_count": {
+          "type": "integer",
+          "description": "Number of versions for prompt/template"
+        },
+        "head_version_id": {
+          "type": ["string", "null"],
+          "description": "Current HEAD version id"
+        },
+        "head_version_number": {
+          "type": ["string", "null"],
+          "description": "Current HEAD version number"
+        },
+        "provider": {
+          "type": ["string", "null"],
+          "description": "Chat provider (for chat entries)"
+        },
+        "model": {
+          "type": ["string", "null"],
+          "description": "Chat model (for chat entries)"
+        },
+        "conversation_id": {
+          "type": ["string", "null"],
+          "description": "Provider conversation id (for chat entries)"
+        },
+        "turn_count": {
+          "type": "integer",
+          "description": "Number of user turns (for chat entries)"
         }
       }
     }

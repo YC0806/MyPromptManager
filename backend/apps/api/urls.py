@@ -24,4 +24,8 @@ urlpatterns = [
 
     # Search (from common API)
     path('search', views.SearchView.as_view(), name='search'),
+
+    # Index management
+    path('index/status', views.IndexStatusView.as_view(), name='index-status'),
+    path('index/rebuild', views.IndexRebuildView.as_view(), name='index-rebuild'),
 ]

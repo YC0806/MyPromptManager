@@ -6,6 +6,7 @@ Django + DRF 实现的 Prompt/Template/Chat 管理后端，使用本地文件作
 - Prompt 与 Template 的文件化版本管理，元数据（YAML）与正文（Markdown + front matter）分离。
 - Template 支持变量描述（类型、默认值等），便于渲染或校验。
 - Chat 记录支持按 `provider + conversation_id` 去重更新，自动计算对话轮次（按 user 消息计数）。
+- 内置 `index.json` 索引与 `/v1/search` 查询，提供 `/v1/index/status`、`/v1/index/rebuild` 管理接口。
 - 默认无鉴权，便于本地开发与集成。
 
 ## 快速开始
@@ -34,7 +35,12 @@ python manage.py runserver 0.0.0.0:8000
   - `prompts/prompt-<prompt_id>/prompt.yaml`：完整元数据；`versions/pv-<prompt_id>_<version_id>.md`：正文 + 最小化 front matter；`HEAD` 指向当前版本。
   - `templates/template-<template_id>/template.yaml` 与 `versions/tv-<template_id>_<version_id>.md`：结构同上，front matter 还包含 `variables`。
   - `chats/chat_<title-slug>-<chat_id>.json`：单文件存储聊天记录。
-- 索引文件路径：`<STORAGE_ROOT>/.promptmeta/index.json`（索引服务存在，但 `/v1/search` 暂未实现实际搜索逻辑）。
+- 索引文件路径：`<STORAGE_ROOT>/.promptmeta/index.json`，包含 prompts/templates/chats 的摘要，维护 `last_updated`、`last_error` 等元信息，锁文件位于同目录 `index.lock`。
+
+## 索引与搜索
+- 搜索：`GET /v1/search`，支持 `type`、`labels`、`author`、`slug`、`limit`、`cursor`，结果来自 index 缓存。
+- 索引状态：`GET /v1/index/status` 返回各类型数量、索引大小、更新时间、上次错误等。
+- 索引重建：`POST /v1/index/rebuild` 从存储全量扫描重建索引（返回统计与错误列表）。
 
 ## API 文档
 - 详见同目录下的 [`API_REFERENCE.md`](./API_REFERENCE.md)，内容与 `apps/api/views.py` 保持同步并以实际响应为准。

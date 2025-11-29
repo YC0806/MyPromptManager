@@ -141,7 +141,7 @@
   - `description` *(可选, string, 默认 `""`)*
   - `variables` *(可选, object[])*：每项格式
     ```json
-    { "name": "sender", "type": "str", "description": "发件人", "default_value": "Support Team" }
+    { "name": "sender", "type": "str", "description": "发件人", "default": "Support Team" }
     ```
     - `type` 允许：`str` / `int` / `float` / `bool`（其他值将回退为 `str`）。
   - 其他字段会被忽略；`author` 后端写入 `"You"`。
@@ -200,7 +200,7 @@
     "created_at": "2024-05-06T10:20:00Z",
     "author": "You",
     "variables": [
-      { "name": "sender", "type": "str", "description": "发件人", "default_value": "Support Team" }
+      { "name": "sender", "type": "str", "description": "发件人", "default": "Support Team" }
     ],
     "content": "# 模板正文"
   }
@@ -214,20 +214,23 @@
 ### GET /chats
 - 查询参数：
   - `provider` *(可选)*：按 provider 等值过滤（大小写不敏感）。
+  - `labels` *(可选, 可重复)*：AND 过滤。
   - `limit` *(可选, 默认 100)*
-- 响应：按 `updated_at` 倒序，缺失 `turn_count` 时会按 `role == "user"` 的消息数补充。
+- 响应：按 `updated_at` 倒序的摘要列表（不含 messages），缺失 `turn_count` 时会按 `role == "user"` 的消息数补充。
   ```json
   {
-    "chats": [
+    "items": [
       {
         "id": "01HK...XYZ",
-        "provider": "ChatGPT",
-        "conversation_id": "conv-123",
         "title": "对话标题",
-        "messages": [{ "role": "user", "content": "hi" }],
-        "tags": ["demo"],
-        "created_at": "2024-05-06T11:00:00Z",
+        "type": "chat",
+        "labels": ["demo"],
+        "description": "",
         "updated_at": "2024-05-06T11:10:00Z",
+        "created_at": "2024-05-06T11:00:00Z",
+        "author": "system",
+        "provider": "ChatGPT",
+        "model": "gpt-4",
         "turn_count": 1
       }
     ],
@@ -255,21 +258,96 @@
 - 失败示例：缺少 `title` 会触发 `422 ValidationError`。
 
 ### GET /chats/{chat_id}
-- 返回完整聊天对象；若缺失 `turn_count`，会在返回时计算并补充。
+- 返回聊天摘要（同列表项，不含 messages）。
 
 ### PUT /chats/{chat_id}
-- 用途：整体更新聊天对象（文件将被覆盖），`updated_at` 由后端改写为当前时间。
-- 请求体：任意聊天结构；务必包含需要保留的字段（如 `messages`、`tags` 等）。
+- 用途：更新聊天元数据（title、labels、description、author），`updated_at` 由后端改写为当前时间。消息请使用 `/chats/{chat_id}/messages`。
 - 成功响应：`200 OK`
   ```json
   { "id": "01HK...XYZ", "updated_at": "2024-05-06T11:12:00Z" }
   ```
 
 ### DELETE /chats/{chat_id}
-- 删除聊天记录，成功返回 `204 No Content`。
+- 删除聊天记录，成功返回 `200 OK`：
+  ```json
+  { "success": true, "id": "01HK...XYZ" }
+  ```
+
+### GET /chats/{chat_id}/messages
+- 返回聊天消息与轮次：
+  ```json
+  {
+    "chat_id": "01HK...XYZ",
+    "messages": [{ "role": "user", "content": "hi" }],
+    "turn_count": 1
+  }
+  ```
+
+### PUT /chats/{chat_id}/messages
+- 用途：整体替换消息数组；`turn_count` 会根据 `role == "user"` 自动计算。
+- 请求体：
+  ```json
+  { "messages": [{ "role": "user", "content": "hi" }] }
+  ```
+- 成功响应：
+  ```json
+  { "success": true, "id": "01HK...XYZ", "turn_count": 1 }
+  ```
 
 ## Search
 
 ### GET /search
-- 查询参数：`type`（prompt/template/chat）、`labels`（可重复）、`author`、`limit`（默认 50）、`cursor`。
-- 当前实现：未完成搜索逻辑，始终返回空列表 `[]`，可视为占位接口。
+- 查询参数：`type`（prompt/template/chat）、`labels`（可重复，AND 过滤）、`author`、`slug`、`limit`（默认 50）、`cursor`（上一页最后一条的 `id`）。
+- 响应：来自 `index.json` 的倒序结果（按 `updated_at`），并提供游标分页：
+  ```json
+  {
+    "items": [
+      {
+        "id": "01HF6X...W8W",
+        "type": "prompt",
+        "title": "Greeting",
+        "description": "示例",
+        "slug": "greeting",
+        "labels": ["demo"],
+        "author": "You",
+        "created_at": "2024-05-06T10:15:00Z",
+        "updated_at": "2024-05-06T10:16:00Z",
+        "file_path": "prompts/prompt_greeting-01HF6X...W8W/HEAD",
+        "sha": "latest",
+        "version_count": 2,
+        "head_version_id": "abc12",
+        "head_version_number": "2"
+      }
+    ],
+    "count": 1,
+    "next_cursor": null
+  }
+  ```
+
+## Index
+
+### GET /index/status
+- 用途：查看索引状态信息。
+- 响应字段：
+  - `prompts_count` / `templates_count` / `chats_count`
+  - `entries_count`：上述三项之和
+  - `last_updated`
+  - `index_size_bytes`
+  - `last_error`（若上次重建有错误）
+  - `lock_status`：固定返回 `"unlocked"`（锁由 filelock 控制）
+
+### POST /index/rebuild
+- 用途：从存储全量重建 `index.json`。
+- 成功响应：
+  ```json
+  {
+    "success": true,
+    "stats": {
+      "prompts_added": 10,
+      "templates_added": 5,
+      "chats_added": 3,
+      "errors": []
+    }
+  }
+  ```
+- 失败：索引被占用时返回 `423`。

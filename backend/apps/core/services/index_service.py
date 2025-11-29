@@ -31,6 +31,7 @@ class IndexService:
                 'templates': [],
                 'chats': [],
                 'last_updated': datetime.utcnow().isoformat(),
+                'last_error': None,
             }
             self.index_path.write_text(json.dumps(initial_data, indent=2))
 
@@ -40,12 +41,18 @@ class IndexService:
         try:
             return json.loads(self.index_path.read_text())
         except json.JSONDecodeError:
-            return {'prompts': [], 'templates': [], 'chats': []}
+            return {
+                'prompts': [],
+                'templates': [],
+                'chats': [],
+                'last_error': 'index.json corrupted',
+            }
 
     def _write_index(self, data: Dict):
         """Write index.json atomically (requires lock to be held)."""
         # Write to temp file then atomic rename
         temp_path = self.index_path.with_suffix('.tmp')
+        data.setdefault('last_error', None)
         data['last_updated'] = datetime.utcnow().isoformat()
         temp_path.write_text(json.dumps(data, indent=2))
         temp_path.replace(self.index_path)
@@ -256,7 +263,7 @@ class IndexService:
         Returns:
             Dict with rebuild statistics
         """
-        lock = FileLock(str(self.lock_path), timeout=self.lock_timeout)
+                lock = FileLock(str(self.lock_path), timeout=self.lock_timeout)
 
         try:
             with lock:
@@ -264,6 +271,7 @@ class IndexService:
                     'prompts': [],
                     'templates': [],
                     'chats': [],
+                    'last_error': None,
                 }
 
                 stats = {
@@ -279,6 +287,7 @@ class IndexService:
                     for prompt in prompts:
                         try:
                             fields = extract_metadata_fields(prompt)
+                            head_version = prompt.versions[-1] if prompt.versions else None
                             entry = {
                                 'id': fields['id'],
                                 'type': 'prompt',
@@ -289,6 +298,9 @@ class IndexService:
                                 'author': fields['author'],
                                 'created_at': fields['created_at'],
                                 'updated_at': fields['updated_at'],
+                                'version_count': len(prompt.versions),
+                                'head_version_id': head_version.id if head_version else None,
+                                'head_version_number': head_version.version_number if head_version else None,
                                 'file_path': f"prompts/prompt_{fields['slug']}-{fields['id']}/HEAD",
                                 'sha': 'latest',
                             }
@@ -311,6 +323,7 @@ class IndexService:
                     for template in templates:
                         try:
                             fields = extract_metadata_fields(template)
+                            head_version = template.versions[-1] if template.versions else None
                             entry = {
                                 'id': fields['id'],
                                 'type': 'template',
@@ -321,6 +334,9 @@ class IndexService:
                                 'author': fields['author'],
                                 'created_at': fields['created_at'],
                                 'updated_at': fields['updated_at'],
+                                'version_count': len(template.versions),
+                                'head_version_id': head_version.id if head_version else None,
+                                'head_version_number': head_version.version_number if head_version else None,
                                 'file_path': f"templates/template_{fields['slug']}-{fields['id']}/HEAD",
                                 'sha': 'latest',
                             }
@@ -350,6 +366,10 @@ class IndexService:
                                 'slug': chat.get('id'),  # Use ID as slug for chats
                                 'labels': chat.get('tags', []),
                                 'author': chat.get('author', 'system'),
+                                'provider': chat.get('provider'),
+                                'model': chat.get('model'),
+                                'conversation_id': chat.get('conversation_id'),
+                                'turn_count': chat.get('turn_count', 0),
                                 'created_at': chat.get('created_at', datetime.utcnow().isoformat()),
                                 'updated_at': chat.get('updated_at', datetime.utcnow().isoformat()),
                                 'file_path': f"chats/chat_{chat.get('id')}.json",
@@ -367,6 +387,10 @@ class IndexService:
                         'type': 'chats',
                         'error': str(e),
                     })
+
+                # Persist last error if any
+                if stats['errors']:
+                    new_index['last_error'] = stats['errors'][0].get('error')
 
                 self._write_index(new_index)
                 return stats
