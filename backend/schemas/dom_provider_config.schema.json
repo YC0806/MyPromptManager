@@ -1,0 +1,64 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "DomProviderConfig",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["id", "fillSelectors"],
+  "properties": {
+    "id": {"type": "string", "minLength": 1},
+    "urlPatterns": {
+      "type": "array",
+      "items": {"type": "string"}
+    },
+    "conversationIdPattern": {"type": "string"},
+    "conversationIdSelector": {"type": "string"},
+    "conversationIdAttribute": {"type": "string"},
+    "titleSelector": {"type": "string"},
+    "titleAttribute": {"type": "string"},
+    "titlePrefixToRemove": {
+      "type": "array",
+      "items": {"type": "string"}
+    },
+    "titleSuffixToRemove": {
+      "type": "array",
+      "items": {"type": "string"}
+    },
+    "titleFallback": {"type": "string"},
+    "messageSelectors": {
+      "type": "array",
+      "items": {"type": "string"}
+    },
+    "contentSelectors": {
+      "type": "array",
+      "items": {"type": "string"}
+    },
+    "fillSelectors": {
+      "type": "array",
+      "minItems": 1,
+      "items": {"type": "string"}
+    },
+    "role": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "attribute": {"type": "string"},
+        "values": {
+          "type": "object",
+          "additionalProperties": {"type": "string"}
+        },
+        "classHints": {
+          "type": "object",
+          "additionalProperties": {"type": "string"}
+        }
+      }
+    },
+    "timestamp": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "selector": {"type": "string"},
+        "attribute": {"type": "string"}
+      }
+    }
+  }
+}

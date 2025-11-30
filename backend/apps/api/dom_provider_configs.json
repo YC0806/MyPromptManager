@@ -1,0 +1,62 @@
+[
+  {
+    "id": "ChatGPT",
+    "urlPatterns": ["chat.openai.com", "chatgpt.com"],
+    "conversationIdPattern": "/c/([a-zA-Z0-9-]+)",
+    "titleSelector": "title",
+    "messageSelectors": ["[data-message-author-role]"],
+    "contentSelectors": [".markdown", ".message-content", "[class*=\"markdown\"]"],
+    "role": {
+      "attribute": "data-message-author-role",
+      "values": {
+        "user": "user",
+        "assistant": "assistant"
+      }
+    },
+    "fillSelectors": [
+      "#prompt-textarea",
+      "textarea[placeholder*=\"Message\"]",
+      "textarea[data-id=\"root\"]",
+      "textarea"
+    ]
+  },
+  {
+    "id": "Claude",
+    "urlPatterns": ["claude.ai"],
+    "conversationIdPattern": "/chat/([a-zA-Z0-9-]+)",
+    "titleSelector": "[class*=\"ChatTitle\"], [class*=\"conversation-title\"], h1",
+    "messageSelectors": ["[class*=\"Message\"]"],
+    "contentSelectors": ["[class*=\"MessageContent\"]", "[class*=\"message-content\"]", ".markdown", "[class*=\"markdown\"]", "p"],
+    "role": {
+      "attribute": "data-is-user-message",
+      "values": {
+        "true": "user",
+        "false": "assistant"
+      },
+      "classHints": {
+        "user": "user",
+        "assistant": "assistant",
+        "claude": "assistant"
+      }
+    },
+    "fillSelectors": ["[contenteditable=\"true\"][placeholder]", "[contenteditable=\"true\"]", "textarea"]
+  },
+  {
+    "id": "Gemini",
+    "urlPatterns": ["gemini.google.com"],
+    "conversationIdPattern": "/chat/([a-zA-Z0-9-_]+)",
+    "titleSelector": "[class*=\"conversation-title\"], [class*=\"chat-title\"], h1",
+    "messageSelectors": ["[class*=\"message\"]", "[class*=\"turn\"]", "[data-test-id*=\"message\"]"],
+    "contentSelectors": ["[class*=\"message-content\"]", "[class*=\"response-content\"]", "[class*=\"query-content\"]", ".markdown", "[class*=\"markdown\"]"],
+    "role": {
+      "classHints": {
+        "user": "user",
+        "user-turn": "user",
+        "user-message": "user",
+        "model": "assistant",
+        "assistant": "assistant"
+      }
+    },
+    "fillSelectors": ["[contenteditable=\"true\"]", "textarea[placeholder]", "textarea"]
+  }
+]

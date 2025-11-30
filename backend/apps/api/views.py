@@ -13,6 +13,7 @@ from backend.apps.core.exceptions import ValidationError, BadRequestError
 from backend.apps.core.domain.itemmetadata import ItemMetadata
 from backend.apps.core.domain.version import TemplateVariable
 from backend.apps.core.domain.chatmetadata import ChatMetadata
+from backend.apps.api.dom_providers import dom_provider_store
 
 # ============================================================================
 # Prompts
@@ -620,6 +621,67 @@ class IndexRebuildView(APIView):
             return Response({'success': True, 'stats': stats})
         except Exception as e:
             return Response({'detail': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+# =============================================================================
+# DOM Providers (for browser extension)
+# =============================================================================
+
+
+class DomProvidersView(APIView):
+    """Expose DOM provider configs with optional filtering and caching hints."""
+
+    cors_headers = {
+        'Access-Control-Allow-Origin': '*',
+        'Access-Control-Allow-Methods': 'GET',
+        'Access-Control-Allow-Headers': 'Content-Type',
+    }
+
+    def get(self, request):
+        host = request.query_params.get('host')
+        path = request.query_params.get('path')
+        requested_version = request.query_params.get('version')
+
+        # Return 304 when version matches and no filtering is requested
+        if not host and not path and requested_version and requested_version == dom_provider_store.version:
+            response = Response(status=status.HTTP_304_NOT_MODIFIED)
+            return self._add_cors_headers(response)
+
+        configs = dom_provider_store.filter_configs(host=host, path=path)
+        response = Response({
+            'version': dom_provider_store.version,
+            'providers': configs,
+        }, status=status.HTTP_200_OK)
+        return self._add_cors_headers(response)
+
+    def _add_cors_headers(self, response: Response) -> Response:
+        for key, value in self.cors_headers.items():
+            response[key] = value
+        return response
+
+
+class DomProviderDetailView(DomProvidersView):
+    """Retrieve a single DOM provider configuration."""
+
+    def get(self, request, provider_id):
+        host = request.query_params.get('host')
+        path = request.query_params.get('path')
+        provider = dom_provider_store.get_config(provider_id)
+
+        if not provider:
+            response = Response({'detail': 'Provider not found'}, status=status.HTTP_404_NOT_FOUND)
+            return self._add_cors_headers(response)
+
+        filtered = dom_provider_store.filter_configs(host=host, path=path)
+        if provider not in filtered:
+            response = Response({'detail': 'Provider not available for requested host/path'}, status=status.HTTP_404_NOT_FOUND)
+            return self._add_cors_headers(response)
+
+        response = Response({
+            'version': dom_provider_store.version,
+            **provider,
+        }, status=status.HTTP_200_OK)
+        return self._add_cors_headers(response)
 
 
 # ============================================================================
