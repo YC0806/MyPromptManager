@@ -33,9 +33,18 @@ export interface TimestampConfig {
 
 export interface DomProviderConfig {
   id: string;
-  matches: (url: string) => boolean;
-  getConversationId: () => string | null;
-  getTitle: () => string;
+  matches?: (url: string) => boolean;
+  urlPatterns?: string[];
+  conversationIdPattern?: string;
+  conversationIdSelector?: string;
+  conversationIdAttribute?: string;
+  getConversationId?: () => string | null;
+  getTitle?: () => string;
+  titleSelector?: string;
+  titleAttribute?: string;
+  titlePrefixToRemove?: string[];
+  titleSuffixToRemove?: string[];
+  titleFallback?: string;
   messageSelectors?: string[];
   findMessageElements?: () => Element[];
   messageFilter?: (element: Element) => boolean;

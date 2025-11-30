@@ -1,8 +1,29 @@
 import { detectProvider, Provider } from '../services/provider-registry';
 import { getConfig } from '../services/config.js';
-import { Conversation } from '../shared/models';
+import { Conversation, DomProviderConfig } from '../shared/models';
+import { parseConversationFromDom } from './dom-parser';
+import { deserializeDomProviderConfig, matchesUrl, StoredDomProviderConfig } from '../shared/provider-config';
+import { fillInput } from '../providers/utils';
 
-const provider: Provider | undefined = detectProvider(window.location.href);
+let provider: Provider | undefined = detectProvider(window.location.href);
+let domProviderConfig: DomProviderConfig | undefined;
+
+async function loadProviderConfig(forceRefresh = false) {
+  try {
+    const response = await chrome.runtime.sendMessage({
+      action: forceRefresh ? 'refreshDomProviders' : 'getDomProviders',
+    });
+
+    const configs = (response?.providers || []).map((cfg: StoredDomProviderConfig) => deserializeDomProviderConfig(cfg));
+    domProviderConfig = configs.find((cfg) => matchesUrl(cfg, window.location.href));
+  } catch (error) {
+    console.error('[Content] Failed to load provider configs', error);
+  }
+
+  if (!domProviderConfig && !provider && !forceRefresh) {
+    await loadProviderConfig(true);
+  }
+}
 
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   if (request.action === 'extractConversation') {
@@ -23,11 +44,13 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
 });
 
 async function handleExtract(): Promise<Conversation> {
-  if (!provider) {
+  if (!domProviderConfig && !provider) {
     throw new Error('当前页面不是支持的 AI 提供商');
   }
 
-  const conversationData = await provider.extract();
+  const conversationData = domProviderConfig
+    ? parseConversationFromDom(domProviderConfig)
+    : await provider!.extract();
   const response = await chrome.runtime.sendMessage({
     action: 'extractConversation',
     data: conversationData,
@@ -41,15 +64,20 @@ async function handleExtract(): Promise<Conversation> {
 }
 
 async function handleFill(content: string) {
-  if (!provider) {
+  if (!domProviderConfig && !provider) {
     throw new Error('当前页面不是支持的 AI 提供商');
   }
-  await provider.fill(content);
+
+  if (domProviderConfig) {
+    await fillInput(content, domProviderConfig.fillSelectors);
+  } else {
+    await provider!.fill(content);
+  }
 }
 
 async function autoExtractIfEnabled() {
   try {
-    if (!provider) return;
+    if (!domProviderConfig && !provider) return;
     const config = await getConfig();
     if (config.autoSync) {
       setTimeout(() => {
@@ -61,10 +89,12 @@ async function autoExtractIfEnabled() {
   }
 }
 
-if (document.readyState === 'loading') {
-  document.addEventListener('DOMContentLoaded', autoExtractIfEnabled);
-} else {
-  autoExtractIfEnabled();
-}
+loadProviderConfig().then(() => {
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', autoExtractIfEnabled);
+  } else {
+    autoExtractIfEnabled();
+  }
+});
 
-console.log('MyPromptManager content script loaded', { provider: provider?.id || 'unknown' });
+console.log('MyPromptManager content script loaded', { provider: provider?.id || domProviderConfig?.id || 'unknown' });
