@@ -1,5 +1,81 @@
 import { Conversation, DomProviderConfig, Message, Role } from '../shared/models';
 
+function matchFromPattern(value: string | null | undefined, pattern?: string): string | null {
+  if (!value || !pattern) return value || null;
+  try {
+    const regex = new RegExp(pattern);
+    const result = value.match(regex);
+    if (result && result[1]) {
+      return result[1];
+    }
+  } catch (error) {
+    console.warn('[DomParser] Invalid regex pattern', pattern, error);
+  }
+  return value || null;
+}
+
+function resolveConversationId(config: DomProviderConfig): string | null {
+  if (typeof config.getConversationId === 'function') return config.getConversationId();
+
+  if (config.conversationIdPattern) {
+    const urlMatch = window.location.href.match(new RegExp(config.conversationIdPattern));
+    if (urlMatch?.[1]) return urlMatch[1];
+  }
+
+  if (config.conversationIdSelector) {
+    const element = document.querySelector(config.conversationIdSelector);
+    const rawValue = config.conversationIdAttribute
+      ? element?.getAttribute(config.conversationIdAttribute)
+      : element?.textContent;
+    const value = rawValue?.trim() || '';
+    if (value) {
+      return matchFromPattern(value, config.conversationIdPattern);
+    }
+  }
+
+  return null;
+}
+
+function normalizeTitle(config: DomProviderConfig): string {
+  if (typeof config.getTitle === 'function') return config.getTitle();
+
+  const selectors = config.titleSelector ? config.titleSelector.split(',').map((s) => s.trim()) : ['title'];
+  let title = '';
+
+  for (const selector of selectors) {
+    const element = document.querySelector(selector);
+    if (element) {
+      const value = (config.titleAttribute ? element.getAttribute(config.titleAttribute) : element.textContent) || '';
+      if (value.trim()) {
+        title = value.trim();
+        break;
+      }
+    }
+  }
+
+  if (!title) {
+    title = document.title || config.titleFallback || 'Untitled Conversation';
+  }
+
+  if (config.titlePrefixToRemove?.length) {
+    config.titlePrefixToRemove.forEach((prefix) => {
+      if (title.startsWith(prefix)) {
+        title = title.slice(prefix.length).trim();
+      }
+    });
+  }
+
+  if (config.titleSuffixToRemove?.length) {
+    config.titleSuffixToRemove.forEach((suffix) => {
+      if (title.endsWith(suffix)) {
+        title = title.slice(0, -suffix.length).trim();
+      }
+    });
+  }
+
+  return title || 'Untitled Conversation';
+}
+
 function randomId(prefix: string): string {
   if (typeof crypto !== 'undefined' && 'randomUUID' in crypto) {
     return `${prefix}_${crypto.randomUUID()}`;
@@ -94,12 +170,12 @@ function inferRoleFromSequence(messages: Message[]): Role {
 }
 
 export function parseConversationFromDom(config: DomProviderConfig): Conversation {
-  const conversationId = config.getConversationId();
+  const conversationId = resolveConversationId(config);
   if (!conversationId) {
     throw new Error('无法获取对话 ID');
   }
 
-  const title = config.getTitle() || 'Untitled Conversation';
+  const title = normalizeTitle(config);
   const messageElements = collectMessageElements(config);
   const messages: Message[] = [];
 
