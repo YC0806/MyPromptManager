@@ -1,4 +1,4 @@
-import { detectProvider } from '../services/provider-registry.js';
+import { detectProvider } from '../services/provider-registry';
 import { getConfig, saveConfig } from '../services/config.js';
 import { fetchLibraryItems, fetchItemDetail } from '../services/library.js';
 import { renderTemplate } from '../core/template.js';

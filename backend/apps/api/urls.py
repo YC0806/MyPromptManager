@@ -28,4 +28,8 @@ urlpatterns = [
     # Index management
     path('index/status', views.IndexStatusView.as_view(), name='index-status'),
     path('index/rebuild', views.IndexRebuildView.as_view(), name='index-rebuild'),
+
+    # DOM Providers for browser extension
+    path('providers', views.DomProvidersView.as_view(), name='providers-list'),
+    path('providers/<str:provider_id>', views.DomProviderDetailView.as_view(), name='provider-detail'),
 ]
