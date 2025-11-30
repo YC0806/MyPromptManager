@@ -351,3 +351,33 @@
   }
   ```
 - 失败：索引被占用时返回 `423`。
+
+## DOM Providers（浏览器插件使用）
+
+### GET /providers
+- 用途：为浏览器扩展提供 DOM 解析配置，可选按域名/路径过滤。
+- 查询参数：
+  - `host` *(可选)*：仅返回 `urlPatterns` 匹配该 host 的配置。
+  - `path` *(可选)*：仅返回 `conversationIdPattern` 能匹配该 path 的配置。
+  - `version` *(可选)*：若与当前版本一致且未指定过滤条件，返回 `304 Not Modified`。
+- 响应：`200 OK`
+  ```json
+  {
+    "version": "a1b2c3d4e5f6",
+    "providers": [
+      {
+        "id": "ChatGPT",
+        "urlPatterns": ["chat.openai.com", "chatgpt.com"],
+        "conversationIdPattern": "/c/([a-zA-Z0-9-]+)",
+        "messageSelectors": ["[data-message-author-role]"],
+        "contentSelectors": [".markdown"],
+        "fillSelectors": ["#prompt-textarea", "textarea"]
+      }
+    ]
+  }
+  ```
+- 额外响应头：`Access-Control-Allow-Origin: *`（方便浏览器插件跨域调用）。
+
+### GET /providers/{id}
+- 用途：获取单个 provider 的配置，支持同样的 `host` / `path` 过滤。
+- 成功响应：`200 OK`，包含 `version` 字段与配置内容。若配置不存在或不匹配过滤条件，返回 `404`。
