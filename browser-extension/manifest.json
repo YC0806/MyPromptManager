@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "MyPromptManager - AI History Sync",
-  "version": "1.1.0",
+  "version": "1.1.1",
   "description": "从主流 AI 提供商提取对话历史并同步到 MyPromptManager，支持浏览和一键填入 Prompt/Template",
   "permissions": [
     "storage",
@@ -14,33 +14,23 @@
     "https://chat.deepseek.com/*",
     "https://claude.ai/*",
     "https://gemini.google.com/*",
+    "https://www.doubao.com/*",
     "http://localhost:8000/*"
   ],
   "background": {
-    "service_worker": "background.js"
+    "service_worker": "dist/background.js"
   },
   "content_scripts": [
     {
       "matches": [
         "https://chat.openai.com/*",
-        "https://chatgpt.com/*"
+        "https://chatgpt.com/*",
+        "https://chat.deepseek.com/*",
+        "https://claude.ai/*",
+        "https://gemini.google.com/*",
+        "https://www.doubao.com/*"
       ],
-      "js": ["content-scripts/chatgpt.js"],
-      "run_at": "document_idle"
-    },
-    {
-      "matches": ["https://chat.deepseek.com/*"],
-      "js": ["content-scripts/deepseek.js"],
-      "run_at": "document_idle"
-    },
-    {
-      "matches": ["https://claude.ai/*"],
-      "js": ["content-scripts/claude.js"],
-      "run_at": "document_idle"
-    },
-    {
-      "matches": ["https://gemini.google.com/*"],
-      "js": ["content-scripts/gemini.js"],
+      "js": ["dist/content.js"],
       "run_at": "document_idle"
     }
   ],

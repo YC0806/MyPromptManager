@@ -1,0 +1,17 @@
+{
+  "name": "browser-extension",
+  "version": "1.0.0",
+  "description": "MyPromptManager 浏览器扩展是一个强大的工具，用于管理 AI 提示词、模版，并自动采集主流 AI 平台的对话历史。",
+  "main": "dist/background.js",
+  "scripts": {
+    "build": "node scripts/build.js",
+    "build:prod": "NODE_ENV=production node scripts/build.js",
+    "test": "echo \"No tests defined\""
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "esbuild": "^0.27.0"
+  }
+}

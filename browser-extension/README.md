@@ -1,13 +1,38 @@
-# MyPromptManager - AI History Sync 浏览器插件
+# MyPromptManager 浏览器扩展
 
-这是一个浏览器插件，用于从主流 AI 提供商（ChatGPT、DeepSeek、Claude、Gemini）的网页前端自动提取对话历史，并同步到 MyPromptManager 系统中。
+MyPromptManager 浏览器扩展是一个强大的工具，用于管理 AI 提示词、模版，并自动采集主流 AI 平台的对话历史。
 
 ## 功能特性
 
-### 对话历史同步
+### 🚀 核心功能
 
-- ✅ **多平台支持**：支持 ChatGPT、DeepSeek、Claude、Gemini
-- ✅ **自动提取**：自动检测并提取当前页面的对话历史
+1. **提示词库管理**
+   - 浏览和搜索 Prompts 和 Templates
+   - 一键复制到剪贴板
+   - 一键填入当前 AI 对话框
+
+2. **模版参数渲染**
+   - 支持模版变量（`{{variable_name}}` 格式）
+   - 动态表单填写参数
+   - 实时预览渲染结果
+
+3. **对话历史采集**
+   - 自动提取 AI 对话内容
+   - 支持手动触发提取
+   - 自动同步到后端服务器
+
+4. **去重与批量处理**
+   - 智能消息去重（基于内容哈希）
+   - 批量上传对话历史
+   - 本地缓存防止数据丢失
+
+## 支持的 AI 平台
+
+- ✅ **ChatGPT** (chat.openai.com, chatgpt.com)
+- ✅ **Claude** (claude.ai)
+- ✅ **DeepSeek** (chat.deepseek.com)
+- ✅ **Gemini** (gemini.google.com)
+- ✅ **豆包 Doubao** (www.doubao.com)
 - ✅ **智能同步**：自动同步到 MyPromptManager 后端
 - ✅ **去重处理**：相同对话 ID 的历史记录会自动更新而不是重复创建
 - ✅ **离线存储**：先保存到本地，再同步到服务器
@@ -152,6 +177,44 @@ Firefox 版本需要将 manifest.json 修改为 manifest v2 格式。暂不支�
 - ✅ **无外部服务**：不会将数据发送到任何第三方服务器
 - ✅ **开源透明**：所有代码开源，可自行审查
 
+## 快速开始（2分钟上手）
+
+### 第一步：安装依赖并构建扩展
+```bash
+cd browser-extension
+npm install
+npm run build
+```
+生成的产物位于 `dist/`，manifest 已指向该目录。
+
+### 第二步：验证后端API
+```bash
+# 在项目根目录运行测试脚本
+./test_browser_extension_api.sh
+```
+所有测试应显示 ✅，如有错误请先解决后端问题。
+
+### 第三步：安装插件
+1. 打开 Chrome 浏览器，访问 `chrome://extensions/`
+2. 打开右上角"开发者模式"开关
+3. 点击"加载已解压的扩展程序"，选择 `browser-extension` 目录
+4. 确认插件图标出现在工具栏
+
+### 第四步：配置API地址
+1. 点击插件图标，切换到"对话同步"标签
+2. 点击"设置"按钮
+3. 确认API地址：`http://localhost:8000/v1`
+4. 保存设置
+
+### 第五步：试用功能
+1. 切换到"Prompt库"标签，查看你的Prompts和Templates
+2. 访问 https://chat.openai.com，打开插件，测试"提取当前对话"
+3. 点击任意Prompt，测试"填入对话框"功能
+
+✅ 全部完成！详细使用方法见下文。
+
+---
+
 ## 故障排除
 
 ### 插件无法加载
@@ -186,38 +249,44 @@ Firefox 版本需要将 manifest.json 修改为 manifest v2 格式。暂不支�
 
 ## 开发说明
 
-### 文件结构
+### 文件结构（重构后）
 
 ```
 browser-extension/
-├── manifest.json                    # 插件配置文件
-├── background.js                    # 后台服务脚本
-├── popup.html                      # 弹出窗口 HTML（双标签页界面）
-├── popup.js                        # 弹出窗口脚本（包含库浏览功能）
-├── content-scripts/                # 内容脚本目录
-│   ├── chatgpt.js                 # ChatGPT 提取器 + 填充器
-│   ├── deepseek.js                # DeepSeek 提取器 + 填充器
-│   ├── claude.js                  # Claude 提取器 + 填充器
-│   ├── gemini.js                  # Gemini 提取器 + 填充器
-│   └── fill-input-utils.js        # 通用填充工具函数
-├── icons/                          # 图标目录
-│   ├── icon16.png
-│   ├── icon32.png
-│   ├── icon48.png
-│   └── icon128.png
-├── test_api.sh                     # API 测试脚本
-└── README.md                       # 本文档
+├── manifest.json              # MV3 配置，指向 dist 产物
+├── popup.html                 # 弹窗页面（加载 dist/popup.js）
+├── src/                       # 可维护的源码目录
+│   ├── core/                  # 模型/去重/模板渲染等纯逻辑
+│   ├── platform/              # storage/messaging/http 适配层
+│   ├── services/              # config/sync/library/provider-registry
+│   ├── providers/             # 各平台提取与填充实现
+│   ├── background/            # Service Worker 入口
+│   ├── content/               # 内容脚本入口（统一注册所有平台）
+│   └── popup/                 # 弹窗交互入口
+├── dist/                      # esbuild 输出（背景页/内容脚本/弹窗）
+├── scripts/build.js           # 构建脚本（esbuild）
+├── package.json               # 构建依赖与脚本
+├── icons/                     # 图标资源
+└── test_api.sh                # API 测试脚本
 ```
+
+### 构建与调试
+
+```
+cd browser-extension
+npm install
+npm run build        # 开发模式（含 sourcemap）
+npm run build:prod   # 压缩产物
+```
+
+构建后加载 `dist/` 中的脚本，源代码修改后需重新执行构建。
 
 ### 添加新的 AI 提供商
 
-1. 在 `content-scripts/` 目录创建新的提取器脚本
-2. 在 `manifest.json` 中添加对应的 content_script 配置
-3. 实现对话提取逻辑：
-   - 获取对话 ID
-   - 获取对话标题
-   - 提取消息列表（用户和助手的对话）
-4. 在 `popup.js` 的 `detectProvider()` 函数中添加检测逻辑
+1. 在 `src/providers/` 新增一个文件，导出 `{ id, matches(url), extract(), fill(content) }`
+2. 在 `src/services/provider-registry.js` 注册该 provider
+3. 如需新域名，更新 `manifest.json` 的 `matches` 与 `host_permissions`
+4. 运行 `npm run build` 重新生成 `dist/`
 
 ### 测试 API 集成
 
@@ -244,6 +313,17 @@ cd browser-extension
 4. 查看 Console 标签页的日志输出
 
 ## 更新日志
+
+### v1.1.1 (2025-11-29)
+- 🐛 **Bug修复：API适配问题**
+  - ✅ 修复插件与后端API版本获取方式不匹配的问题
+  - ✅ 改进版本内容获取逻辑，使用版本列表API获取最新版本
+  - ✅ 优化错误处理和加载提示
+- 📚 **文档完善**
+  - ✅ 新增API兼容性修复报告 ([API_COMPATIBILITY_FIX.md](API_COMPATIBILITY_FIX.md))
+  - ✅ 新增验证指南 ([VERIFICATION_GUIDE.md](VERIFICATION_GUIDE.md))
+  - ✅ 新增问题总结文档 ([ISSUE_SUMMARY.md](ISSUE_SUMMARY.md))
+  - ✅ 新增测试脚本 (`../test_browser_extension_api.sh`)
 
 ### v1.1.0 (2025-11)
 - 🎉 **新功能：Prompt & Template 库浏览**

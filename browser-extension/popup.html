@@ -535,10 +535,6 @@
           <span class="status-value" id="currentProvider">未检测到</span>
         </div>
         <div class="status-item">
-          <span class="status-label">自动同步</span>
-          <span class="status-badge" id="autoSyncStatus">-</span>
-        </div>
-        <div class="status-item">
           <span class="status-label">已保存对话</span>
           <span class="status-value" id="savedCount">0</span>
         </div>
@@ -555,15 +551,7 @@
       <div id="settingsSection" class="hidden">
         <div class="input-group">
           <label class="input-label">API 地址</label>
-          <input type="text" class="input-field" id="apiUrl" placeholder="http://localhost:8000/api/v1">
-        </div>
-
-        <div class="switch-container">
-          <span class="switch-label">自动同步</span>
-          <label class="switch">
-            <input type="checkbox" id="autoSyncToggle">
-            <span class="slider"></span>
-          </label>
+          <input type="text" class="input-field" id="apiUrl" placeholder="http://localhost:8000/v1">
         </div>
 
         <button class="button button-primary" id="saveSettingsBtn">保存设置</button>
@@ -573,7 +561,7 @@
       <!-- Provider Info -->
       <div class="provider-info">
         <strong>支持的 AI 提供商：</strong><br>
-        ChatGPT, DeepSeek, Claude, Gemini
+        ChatGPT, DeepSeek, Claude, Gemini, Doubao
       </div>
     </div>
 
@@ -610,15 +598,27 @@
           <span class="item-type-badge" id="itemTypeBadge"></span>
           <span class="item-date" id="itemDate"></span>
         </div>
+
+        <!-- Template Variables Section -->
+        <div id="templateVariablesSection" class="hidden">
+          <div class="variables-header">
+            <h4 style="font-size: 13px; font-weight: 600; margin: 12px 0 8px 0; color: #334155;">模版参数</h4>
+          </div>
+          <form id="templateVariablesForm">
+            <!-- Variables will be rendered here dynamically -->
+          </form>
+        </div>
+
         <div class="item-content" id="itemContent"></div>
       </div>
       <div class="modal-footer">
+        <button class="button button-primary hidden" id="renderTemplateBtn">渲染模版</button>
         <button class="button button-primary" id="fillInputBtn">填入对话框</button>
         <button class="button button-secondary" id="copyBtn">复制</button>
       </div>
     </div>
   </div>
 
-  <script src="popup.js"></script>
+  <script src="dist/popup.js"></script>
 </body>
 </html>
