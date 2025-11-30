@@ -13,8 +13,8 @@ const common = {
 };
 
 const entryPoints = {
-  background: path.join(__dirname, '..', 'src', 'background', 'index.js'),
-  content: path.join(__dirname, '..', 'src', 'content', 'index.js'),
+  background: path.join(__dirname, '..', 'src', 'background', 'index.ts'),
+  content: path.join(__dirname, '..', 'src', 'content', 'index.ts'),
   popup: path.join(__dirname, '..', 'src', 'popup', 'index.js'),
 };
 

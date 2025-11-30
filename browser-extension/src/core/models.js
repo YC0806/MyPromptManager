@@ -16,6 +16,7 @@ export function normalizeConversation(conversation, existingMessages = []) {
   ]);
 
   return {
+    id: conversation.id || buildHistoryKey(conversation.provider, conversation.conversationId),
     provider: conversation.provider,
     conversationId: conversation.conversationId,
     title: conversation.title || 'Untitled Conversation',
@@ -26,6 +27,8 @@ export function normalizeConversation(conversation, existingMessages = []) {
     created_at: conversation.created_at || new Date().toISOString(),
     updated_at: new Date().toISOString(),
     metadata: conversation.metadata || {},
+    url: conversation.url,
+    extractedAt: conversation.extractedAt || new Date().toISOString(),
   };
 }
 

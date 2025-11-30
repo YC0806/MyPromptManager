@@ -1,4 +1,4 @@
-export function findFirst(selectors = [], predicate = () => true) {
+export function findFirst(selectors: string[] = [], predicate: (element: Element) => boolean = () => true) {
   for (const selector of selectors) {
     const elements = document.querySelectorAll(selector);
     for (const el of elements) {
@@ -8,7 +8,7 @@ export function findFirst(selectors = [], predicate = () => true) {
   return null;
 }
 
-export function fillInput(content, selectors = []) {
+export function fillInput(content: string, selectors: string[] = []) {
   const input = findFirst(selectors, (el) => {
     const rect = el.getBoundingClientRect?.();
     return (!rect || (rect.width > 0 && rect.height > 0)) && !el.disabled;
@@ -18,7 +18,7 @@ export function fillInput(content, selectors = []) {
     throw new Error('无法找到输入框');
   }
 
-  const isContentEditable = input.contentEditable === 'true';
+  const isContentEditable = (input as HTMLElement).contentEditable === 'true';
 
   // 先聚焦，确保输入框处于活跃状态
   input.focus?.();
@@ -26,7 +26,7 @@ export function fillInput(content, selectors = []) {
   if (isContentEditable) {
     // 对于 contenteditable 元素，使用更可靠的方法
     // 1. 清空现有内容
-    input.textContent = '';
+    (input as HTMLElement).textContent = '';
 
     // 2. 使用 document.execCommand (虽然已废弃，但对某些网站仍然必要)
     if (document.execCommand) {
@@ -35,7 +35,7 @@ export function fillInput(content, selectors = []) {
       document.execCommand('insertText', false, content);
     } else {
       // 3. 备用方法：直接设置内容
-      input.textContent = content;
+      (input as HTMLElement).textContent = content;
     }
 
     // 4. 将光标移到末尾
@@ -62,27 +62,27 @@ export function fillInput(content, selectors = []) {
       // 使用原生 setter，绕过 React/Vue 的拦截
       nativeInputValueSetter.call(input, content);
     } else {
-      input.value = content;
+      (input as HTMLInputElement | HTMLTextAreaElement).value = content;
     }
 
     // 设置光标到末尾
-    input.selectionStart = content.length;
-    input.selectionEnd = content.length;
+    (input as HTMLInputElement | HTMLTextAreaElement).selectionStart = content.length;
+    (input as HTMLInputElement | HTMLTextAreaElement).selectionEnd = content.length;
   }
 
   // 触发各种事件以通知框架
   dispatchInputEvents(input);
 
   // 调整 textarea 高度
-  if (!isContentEditable && input.tagName === 'TEXTAREA' && input.style) {
-    input.style.height = 'auto';
-    input.style.height = `${input.scrollHeight}px`;
+  if (!isContentEditable && input.tagName === 'TEXTAREA' && (input as HTMLTextAreaElement).style) {
+    (input as HTMLTextAreaElement).style.height = 'auto';
+    (input as HTMLTextAreaElement).style.height = `${(input as HTMLTextAreaElement).scrollHeight}px`;
   }
 
   return true;
 }
 
-export function dispatchInputEvents(element) {
+export function dispatchInputEvents(element: HTMLElement | HTMLInputElement | HTMLTextAreaElement) {
   // 为了兼容 React、Vue 等现代框架，需要触发多种事件
   const events = [
     // React 特别需要这些事件
@@ -127,13 +127,13 @@ export function dispatchInputEvents(element) {
 
   // 额外触发 React 的内部事件
   // React 16+ 会在元素上存储 fiber 节点
-  const reactPropsKey = Object.keys(element).find(key =>
+  const reactPropsKey = Object.keys(element as unknown as Record<string, unknown>).find(key =>
     key.startsWith('__reactProps') || key.startsWith('__reactEventHandlers')
   );
 
   if (reactPropsKey) {
     // 如果检测到 React，强制触发 React 的 onChange
-    const reactProps = element[reactPropsKey];
+    const reactProps = (element as unknown as Record<string, any>)[reactPropsKey];
     if (reactProps && typeof reactProps.onChange === 'function') {
       try {
         reactProps.onChange({

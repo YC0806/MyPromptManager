@@ -1,7 +1,8 @@
-import { detectProvider } from '../services/provider-registry.js';
+import { detectProvider, Provider } from '../services/provider-registry';
 import { getConfig } from '../services/config.js';
+import { Conversation } from '../shared/models';
 
-const provider = detectProvider(window.location.href);
+const provider: Provider | undefined = detectProvider(window.location.href);
 
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   if (request.action === 'extractConversation') {
@@ -21,7 +22,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   return undefined;
 });
 
-async function handleExtract() {
+async function handleExtract(): Promise<Conversation> {
   if (!provider) {
     throw new Error('当前页面不是支持的 AI 提供商');
   }
@@ -39,7 +40,7 @@ async function handleExtract() {
   return conversationData;
 }
 
-async function handleFill(content) {
+async function handleFill(content: string) {
   if (!provider) {
     throw new Error('当前页面不是支持的 AI 提供商');
   }
